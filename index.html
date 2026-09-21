@@ -143,11 +143,11 @@
       color: #ffffff;
       font-size: 0.85rem;
       font-weight: 700;
-      padding: 5px 12px;
-      border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      padding: 4px 10px;
+      border-radius: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
       white-space: nowrap;
-      margin-top: -8px;
+      margin-top: -6px;
     }
     .badge-callout-sell::after {
       content: "";
@@ -155,7 +155,7 @@
       top: 100%;
       left: 50%;
       transform: translateX(-50%);
-      border-width: 6px;
+      border-width: 5px;
       border-style: solid;
       border-color: #dc3545 transparent transparent transparent;
     }
@@ -167,11 +167,11 @@
       color: #ffffff;
       font-size: 0.85rem;
       font-weight: 700;
-      padding: 5px 12px;
-      border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      padding: 4px 10px;
+      border-radius: 5px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
       white-space: nowrap;
-      margin-top: 8px;
+      margin-top: 6px;
     }
     .badge-callout-buy::after {
       content: "";
@@ -179,7 +179,7 @@
       bottom: 100%;
       left: 50%;
       transform: translateX(-50%);
-      border-width: 6px;
+      border-width: 5px;
       border-style: solid;
       border-color: transparent transparent #2e7d32 transparent;
     }
@@ -243,7 +243,6 @@
     </div>
     
     <div class="header-right">
-      <!-- Discord Webhook 整合區塊 -->
       <div class="webhook-group">
         <span style="font-size: 0.75rem;">🤖 DC:</span>
         <input type="password" id="dc-webhook-url" class="webhook-input" placeholder="貼上 Webhook 網址" />
@@ -320,14 +319,14 @@
       <div class="card" style="flex: 1; display: flex; flex-direction: column;">
         <div class="card-title">訊號推播紀錄</div>
         <div id="log-list" class="log-box" style="flex:1;">
-          <div style="color: #666; text-align: center; padding: 10px;">資料載入中...</div>
+          <div style="color: #666; text-align: center; padding: 10px;">尚未偵測到即時信號</div>
         </div>
       </div>
     </aside>
   </main>
 
   <script>
-    // ========== 1. Discord Webhook 推播管理 ==========
+    // ========== 1. Discord Webhook 模組 ==========
     let discordWebhookUrl = localStorage.getItem('eth_discord_webhook') || '';
     const dcInput = document.getElementById('dc-webhook-url');
     if (discordWebhookUrl) dcInput.value = discordWebhookUrl;
@@ -358,7 +357,7 @@
           color: isBuy ? 0x26a69a : 0xef5350,
           fields: [
             { name: "監控週期", value: tf, inline: true },
-            { name: "觸發進場價", value: `$${price.toFixed(2)}`, inline: true },
+            { name: "觸發現價", value: `$${price.toFixed(2)}`, inline: true },
             { name: "建議防守止損", value: `$${sl.toFixed(2)}`, inline: true }
           ],
           timestamp: new Date().toISOString(),
@@ -379,14 +378,14 @@
 
     function testDiscordWebhook() {
       if (!discordWebhookUrl) {
-        alert('請先在左邊輸入 Webhook 網址並點擊儲存！');
+        alert('請先在輸入框貼上 Webhook 網址並點擊儲存！');
         return;
       }
       sendDiscordNotification("BUY", 2750.0, 2730.0, `${currentInterval} (測試)`);
       alert('已送出測試訊息，請至 Discord 頻道查看！');
     }
 
-    // ========== 2. 音效與語音系統 ==========
+    // ========== 2. 語音系統 ==========
     let audioCtx = null;
     let audioEnabled = true;
     let currentInterval = '15m';
@@ -473,7 +472,7 @@
     }
     window.addEventListener('resize', resizeChart);
 
-    // ========== 4. 指標運算工具 ==========
+    // ========== 4. 指標算法 ==========
     function calcEMA(data, length) {
       const k = 2 / (length + 1);
       const ema = [];
@@ -534,7 +533,7 @@
       return rsiArr;
     }
 
-    // ========== 5. 氣泡標籤管理 ==========
+    // ========== 5. 原版精確氣泡標籤管理 ==========
     let activeBadges = [];
 
     function updateBadgePositions() {
@@ -545,7 +544,7 @@
         const x = timeScale.timeToCoordinate(b.time);
         const y = candleSeries.priceToCoordinate(b.price);
 
-        if (x !== null && y !== null && x >= 0 && x <= chartContainer.clientWidth) {
+        if (x !== null && y !== null && x >= -50 && x <= chartContainer.clientWidth + 50) {
           const el = document.createElement('div');
           el.className = b.type === 'BUY' ? 'badge-callout-buy' : 'badge-callout-sell';
           el.innerText = b.text;
@@ -556,18 +555,20 @@
       });
     }
 
+    // 監聽圖表平移、縮放事件即時重新定位氣泡
     chart.timeScale().subscribeVisibleTimeRangeChange(updateBadgePositions);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(updateBadgePositions);
 
-    // ========== 6. 運算與訊號渲染 ==========
+    // ========== 6. 原版多空運算邏輯 ==========
     let rawCandles = [];
     let lastAlertTimestamp = 0;
 
     function runAnalysisAndRender() {
-      if (rawCandles.length < 210) return;
+      if (rawCandles.length < 50) return;
 
       const fastEma = calcEMA(rawCandles, 9);
       const slowEma = calcEMA(rawCandles, 21);
-      const macroEma = calcEMA(rawCandles, 200);
+      const macroEma = calcEMA(rawCandles, Math.min(200, rawCandles.length - 1));
       const rsi = calcRSI(rawCandles, 14);
       const atr = calcATR(rawCandles, 14);
 
@@ -579,9 +580,10 @@
       const len = rawCandles.length;
       let lastLongIdx = -999;
       let lastShortIdx = -999;
-      const cooldown = 5;
+      const cooldown = 4;
 
-      for (let i = 200; i < len; i++) {
+      const startIdx = Math.max(25, 1);
+      for (let i = startIdx; i < len; i++) {
         const cur = rawCandles[i];
         const prev = rawCandles[i - 1];
 
@@ -594,10 +596,13 @@
         const prevRsi = rsi[i - 1];
         const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
 
+        // 原版做多判斷：快線金叉慢線且價格在慢線上方
         const trendUp = curFast > curSlow;
         const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
         const canLong = (i - lastLongIdx >= cooldown);
 
+        // 原版做空判斷：超買後回落或死叉
+        const deathCross = prevFast >= prevSlow && curFast < curSlow;
         const wasOverbought = prevRsi >= 65;
         const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
         const canShort = (i - lastShortIdx >= cooldown);
@@ -615,7 +620,7 @@
             lastAlertTimestamp = cur.time;
             triggerSignal("BUY", cur.close, cur.close - curAtr * 1.5);
           }
-        } else if (wasOverbought && rsiCrossDown && canShort) {
+        } else if (((wasOverbought && rsiCrossDown) || deathCross) && canShort) {
           lastShortIdx = i;
           activeBadges.push({
             time: cur.time,
@@ -659,7 +664,7 @@
 
     function triggerSignal(type, price, sl) {
       playAlertSound(type);
-      sendDiscordNotification(type, price, sl, currentInterval); // 發送 Discord 推播
+      sendDiscordNotification(type, price, sl, currentInterval);
 
       document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
       document.getElementById('last-sig-type').className = "metric-val " + (type === "BUY" ? "val-bull" : "val-bear");
@@ -678,7 +683,7 @@
       logList.insertBefore(div, logList.firstChild);
     }
 
-    // ========== 7. 週期切換與數據串接 ==========
+    // ========== 7. 週期切換與行情連接 ==========
     let activeWs = null;
 
     function changeTimeframe(tf) {
@@ -705,7 +710,7 @@
       statusEl.className = 'status-badge status-connecting';
 
       const endpoints = [
-        `https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1500`,
+        `https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1000`,
         `https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1000`
       ];
 
@@ -728,10 +733,11 @@
           candleSeries.setData(rawCandles);
           chart.timeScale().fitContent();
           runAnalysisAndRender();
+          setTimeout(updateBadgePositions, 200);
           success = true;
           break;
         } catch (e) {
-          console.warn('Endpoint failed: ' + url, e);
+          console.warn('載入失敗，切換線路: ' + url, e);
         }
       }
 
