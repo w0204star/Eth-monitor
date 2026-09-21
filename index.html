@@ -29,11 +29,7 @@
       gap: 10px;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
-    .header-logo {
-      width: 24px;
-      height: 24px;
-      vertical-align: middle;
-    }
+    .header-logo { width: 24px; height: 24px; vertical-align: middle; }
     .header-title { font-weight: 700; font-size: 1.05rem; color: #f0b90b; white-space: nowrap; }
     .status-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; border: 1px solid #33394d; font-weight: 600; white-space: nowrap; }
     .status-connected { color: #00e676; background: rgba(0, 230, 118, 0.1); border-color: #00e676; }
@@ -114,7 +110,7 @@
 
     main {
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: 1fr 350px;
       height: calc(100vh - 52px);
     }
     #chart-container {
@@ -126,10 +122,10 @@
     aside {
       background: #131722;
       border-left: 1px solid #232733;
-      padding: 16px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
       overflow-y: auto;
     }
     .card {
@@ -150,20 +146,66 @@
     .metric-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 7px;
-      font-size: 0.88rem;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+      align-items: center;
     }
     .metric-val { font-weight: 600; color: #fff; }
     .val-bull { color: #26a69a !important; }
     .val-bear { color: #ef5350 !important; }
+
+    /* 音效設定面板樣式 */
+    .audio-config-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 60%;
+    }
+    .slider-container input[type="range"] {
+      width: 100%;
+      accent-color: #2962ff;
+      cursor: pointer;
+    }
+    .audio-action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .btn-audio-sub {
+      background: #232733;
+      border: 1px solid #3b4254;
+      color: #e2e8f0;
+      padding: 5px 8px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      text-align: center;
+    }
+    .btn-audio-sub:hover { background: #2f3647; color: #fff; }
+    .btn-test-bull { border-color: rgba(38, 166, 154, 0.5); color: #26a69a; }
+    .btn-test-bull:hover { background: rgba(38, 166, 154, 0.2); }
+    .btn-test-bear { border-color: rgba(239, 83, 80, 0.5); color: #ef5350; }
+    .btn-test-bear:hover { background: rgba(239, 83, 80, 0.2); }
+    .file-input-hidden { display: none; }
+
     .log-box {
       font-family: monospace;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       background: #0d1017;
       border: 1px solid #222634;
       border-radius: 6px;
       padding: 8px;
-      max-height: 220px;
+      max-height: 180px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -177,7 +219,6 @@
 <body onclick="initAudio()">
   <header>
     <div class="header-left">
-      <!-- 頂部 ETH 經典水晶圖標 -->
       <svg class="header-logo" viewBox="0 0 32 32">
         <g fill="none" fill-rule="evenodd">
           <circle cx="16" cy="16" r="16" fill="#627EEA"/>
@@ -219,6 +260,7 @@
     <div id="chart-container"></div>
     
     <aside>
+      <!-- 戰情儀表板 -->
       <div class="card">
         <div class="card-title">
           <span>戰情儀表板</span>
@@ -250,8 +292,42 @@
         </div>
       </div>
 
+      <!-- 🎵 音效控制中心 -->
       <div class="card">
-        <div class="card-title">即時信號觸發</div>
+        <div class="card-title">
+          <span>🎵 警報音效設置</span>
+          <span id="audio-source-status" style="color: #2962ff; font-size: 0.72rem;">內建合成音</span>
+        </div>
+        
+        <!-- 音量調節 -->
+        <div class="audio-config-row">
+          <span>警報音量:</span>
+          <div class="slider-container">
+            <input type="range" id="volume-slider" min="0" max="100" value="80" oninput="updateVolume(this.value)" />
+            <span id="volume-val" style="min-width: 30px; text-align: right; color:#fff;">80%</span>
+          </div>
+        </div>
+
+        <!-- 試聽按鈕 -->
+        <div class="audio-action-row">
+          <button class="btn-audio-sub btn-test-bull" onclick="playAlertSound('BUY', true)">▶ 試聽做多音效</button>
+          <button class="btn-audio-sub btn-test-bear" onclick="playAlertSound('SELL', true)">▶ 試聽做空音效</button>
+        </div>
+
+        <!-- 自訂音檔導入 -->
+        <div class="audio-action-row" style="margin-top: 8px;">
+          <input type="file" id="buy-audio-input" class="file-input-hidden" accept="audio/*" onchange="loadCustomAudio(event, 'BUY')" />
+          <input type="file" id="sell-audio-input" class="file-input-hidden" accept="audio/*" onchange="loadCustomAudio(event, 'SELL')" />
+          <button class="btn-audio-sub" onclick="document.getElementById('buy-audio-input').click()">📁 導入多單音檔</button>
+          <button class="btn-audio-sub" onclick="document.getElementById('sell-audio-input').click()">📁 導入空單音檔</button>
+        </div>
+
+        <button class="btn-audio-sub" style="width: 100%; margin-top: 8px;" onclick="resetCustomAudios()">🔄 重置為預設音效</button>
+      </div>
+
+      <!-- 即時信號 -->
+      <div class="card">
+        <div class="card-title">即時信號狀態</div>
         <div class="metric-row">
           <span>最近訊號:</span>
           <span id="last-sig-type" class="metric-val">無</span>
@@ -266,6 +342,7 @@
         </div>
       </div>
 
+      <!-- 推播紀錄 -->
       <div class="card" style="flex: 1; display: flex; flex-direction: column;">
         <div class="card-title">訊號推播紀錄 (GMT+8)</div>
         <div id="log-list" class="log-box" style="flex:1;">
@@ -351,14 +428,77 @@
       alert('已送出測試訊息（包含 @everyone），請至 Discord 頻道查看！');
     }
 
-    // ========== 2. 語音系統 ==========
+    // ========== 2. 強化音效系統 (音量控制 / 試聽 / 自訂音檔) ==========
     let audioCtx = null;
     let audioEnabled = true;
+    let alertVolume = parseFloat(localStorage.getItem('eth_alert_volume') || '0.8');
+    let customBuyAudioBase64 = localStorage.getItem('eth_custom_buy_audio') || null;
+    let customSellAudioBase64 = localStorage.getItem('eth_custom_sell_audio') || null;
     let currentInterval = '15m';
+
+    // 初始化音量滑桿
+    document.addEventListener('DOMContentLoaded', () => {
+      const slider = document.getElementById('volume-slider');
+      slider.value = Math.round(alertVolume * 100);
+      document.getElementById('volume-val').innerText = slider.value + '%';
+      updateAudioStatusText();
+    });
 
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function updateVolume(val) {
+      alertVolume = parseInt(val, 10) / 100;
+      localStorage.setItem('eth_alert_volume', alertVolume.toString());
+      document.getElementById('volume-val').innerText = val + '%';
+    }
+
+    function updateAudioStatusText() {
+      const statusEl = document.getElementById('audio-source-status');
+      if (customBuyAudioBase64 || customSellAudioBase64) {
+        statusEl.innerText = '已套用自訂音檔';
+        statusEl.style.color = '#00e676';
+      } else {
+        statusEl.innerText = '內建合成音';
+        statusEl.style.color = '#2962ff';
+      }
+    }
+
+    function loadCustomAudio(event, type) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) {
+        alert('音檔過大（請小於 5MB）！');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result;
+        if (type === 'BUY') {
+          customBuyAudioBase64 = base64Data;
+          localStorage.setItem('eth_custom_buy_audio', base64Data);
+          alert('✅ 做多自訂音檔載入成功！');
+        } else {
+          customSellAudioBase64 = base64Data;
+          localStorage.setItem('eth_custom_sell_audio', base64Data);
+          alert('✅ 做空自訂音檔載入成功！');
+        }
+        updateAudioStatusText();
+        playAlertSound(type, true);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function resetCustomAudios() {
+      customBuyAudioBase64 = null;
+      customSellAudioBase64 = null;
+      localStorage.removeItem('eth_custom_buy_audio');
+      localStorage.removeItem('eth_custom_sell_audio');
+      updateAudioStatusText();
+      alert('已恢復為系統預設合成音。');
     }
 
     function toggleAudio() {
@@ -369,38 +509,50 @@
       btn.className = audioEnabled ? "btn-audio" : "btn-audio muted";
     }
 
-    function playAlertSound(type) {
-      if (!audioEnabled) return;
+    function playAlertSound(type, isTest = false) {
+      if (!audioEnabled && !isTest) return;
       initAudio();
-      const now = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
 
-      if (type === "BUY") {
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, now);
-        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.18);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-        osc.start(now);
-        osc.stop(now + 0.35);
+      // 1. 若有自訂上傳音檔，優先播放自訂音訊
+      const customAudioData = (type === "BUY") ? customBuyAudioBase64 : customSellAudioBase64;
+      if (customAudioData) {
+        const audio = new Audio(customAudioData);
+        audio.volume = alertVolume;
+        audio.play().catch(e => console.warn('自訂音訊播放受阻:', e));
       } else {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(300, now + 0.25);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-        osc.start(now);
-        osc.stop(now + 0.4);
+        // 2. 播放內建合成音 (精準受滑桿音量控制)
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        if (type === "BUY") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(880, now);
+          osc.frequency.exponentialRampToValueAtTime(1320, now + 0.18);
+          gain.gain.setValueAtTime(alertVolume * 0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        } else {
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.25);
+          gain.gain.setValueAtTime(alertVolume * 0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        }
       }
 
-      if ('speechSynthesis' in window) {
+      // 3. 人聲朗讀播報
+      if ('speechSynthesis' in window && alertVolume > 0.05) {
         const tfText = currentInterval === '1d' ? '日線' : currentInterval;
-        const text = type === "BUY" ? `ETH ${tfText} 出現多單信號` : `ETH ${tfText} 出現空單信號`;
+        const text = type === "BUY" ? `ETH ${tfText} 出現做多信號` : `ETH ${tfText} 出現做空信號`;
         const msg = new SpeechSynthesisUtterance(text);
         msg.lang = 'zh-TW';
+        msg.volume = alertVolume;
         msg.rate = 1.1;
         window.speechSynthesis.speak(msg);
       }
@@ -511,6 +663,24 @@
     let notifiedSignals = new Set();
     let isInitialBoot = true;
 
+    function renderSignalToLog(type, price, sl, timestampSec) {
+      document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
+      document.getElementById('last-sig-type').className = "metric-val " + (type === "BUY" ? "val-bull" : "val-bear");
+      document.getElementById('last-sig-price').innerText = price.toFixed(2) + " USDT";
+      document.getElementById('last-sig-sl').innerText = sl.toFixed(2) + " USDT";
+
+      const logList = document.getElementById('log-list');
+      const timeStr = timestampSec ? formatGMT8Full(timestampSec) : formatGMT8Full(Math.floor(Date.now() / 1000));
+      const div = document.createElement('div');
+      div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
+      div.innerHTML = `<strong>[${timeStr}] (${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
+      
+      if (logList.children[0] && (logList.children[0].innerText.includes('中...') || logList.children[0].innerText.includes('尚未'))) {
+        logList.innerHTML = '';
+      }
+      logList.insertBefore(div, logList.firstChild);
+    }
+
     function runAnalysisAndRender() {
       if (rawCandles.length < 50) return;
 
@@ -525,6 +695,7 @@
       macroEmaLine.setData(macroEma);
 
       const markers = [];
+      const detectedSignals = [];
       const len = rawCandles.length;
       let lastLongIdx = -999;
       let lastShortIdx = -999;
@@ -572,17 +743,39 @@
           });
         }
 
-        if (signalType && !isInitialBoot && (i >= len - 2)) {
-          const sigKey = `${cur.time}_${signalType}`;
-          if (!notifiedSignals.has(sigKey)) {
-            notifiedSignals.add(sigKey);
-            const sl = signalType === "BUY" ? (cur.close - curAtr * 1.5) : (cur.close + curAtr * 1.5);
-            triggerSignal(signalType, cur.close, sl, cur.time);
-          }
+        if (signalType) {
+          const sl = signalType === "BUY" ? (cur.close - curAtr * 1.5) : (cur.close + curAtr * 1.5);
+          detectedSignals.push({ type: signalType, price: cur.close, sl: sl, time: cur.time, idx: i });
         }
       }
 
       candleSeries.setMarkers(markers);
+
+      // 首次載入時回填歷史最近信號至戰情面板
+      if (isInitialBoot && detectedSignals.length > 0) {
+        const recentSubset = detectedSignals.slice(-3);
+        const logList = document.getElementById('log-list');
+        logList.innerHTML = '';
+        for (let sig of recentSubset) {
+          renderSignalToLog(sig.type, sig.price, sig.sl, sig.time);
+          notifiedSignals.add(`${sig.time}_${sig.type}`);
+        }
+      }
+
+      // 即時狀態判定 (倒數兩根以內成立之新訊號即時觸發推播)
+      if (!isInitialBoot) {
+        for (let sig of detectedSignals) {
+          if (sig.idx >= len - 2) {
+            const sigKey = `${sig.time}_${sig.type}`;
+            if (!notifiedSignals.has(sigKey)) {
+              notifiedSignals.add(sigKey);
+              playAlertSound(sig.type);
+              sendDiscordNotification(sig.type, sig.price, sig.sl, currentInterval);
+              renderSignalToLog(sig.type, sig.price, sig.sl, sig.time);
+            }
+          }
+        }
+      }
 
       const last = rawCandles[len - 1];
       const curFast = fastEma[len - 1].value;
@@ -608,27 +801,6 @@
       }
 
       if (isInitialBoot) isInitialBoot = false;
-    }
-
-    function triggerSignal(type, price, sl, timestampSec) {
-      playAlertSound(type);
-      sendDiscordNotification(type, price, sl, currentInterval);
-
-      document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
-      document.getElementById('last-sig-type').className = "metric-val " + (type === "BUY" ? "val-bull" : "val-bear");
-      document.getElementById('last-sig-price').innerText = price.toFixed(2) + " USDT";
-      document.getElementById('last-sig-sl').innerText = sl.toFixed(2) + " USDT";
-
-      const logList = document.getElementById('log-list');
-      const timeStr = timestampSec ? formatGMT8Time(timestampSec) : formatGMT8Time(Math.floor(Date.now() / 1000));
-      const div = document.createElement('div');
-      div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
-      div.innerHTML = `<strong>[${timeStr}] (${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
-      
-      if (logList.children[0] && (logList.children[0].innerText.includes('中...') || logList.children[0].innerText.includes('尚未'))) {
-        logList.innerHTML = '';
-      }
-      logList.insertBefore(div, logList.firstChild);
     }
 
     // ========== 6. 週期切換與行情載入 ==========
