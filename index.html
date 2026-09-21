@@ -8,20 +8,21 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background: #0c0d10; color: #d1d4dc; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-        header { height: 48px; background: #131722; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #2a2e39; }
+        header { height: 50px; background: #131722; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #2a2e39; }
         .logo-group { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #f0b90b; }
         .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #2a2e39; color: #848e9c; }
         .status-badge.online { background: rgba(14, 203, 129, 0.2); color: #0ecb81; }
         .webhook-controls { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-        .webhook-input { background: #1e222d; border: 1px solid #363c4e; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; width: 220px; outline: none; }
-        .btn { background: #2962ff; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s; }
+        .webhook-input { background: #1e222d; border: 1px solid #363c4e; color: #fff; padding: 5px 8px; border-radius: 4px; font-size: 11px; width: 240px; outline: none; }
+        .webhook-input:focus { border-color: #2962ff; }
+        .btn { background: #2962ff; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; }
         .btn:hover { background: #1e4bd8; }
         .btn-test { background: #363c4e; }
         .btn-test:hover { background: #4a5065; }
 
         main { flex: 1; display: flex; position: relative; }
         #chart-container { flex: 1; height: 100%; position: relative; }
-        #hud-container { width: 340px; background: #131722; border-left: 1px solid #2a2e39; display: flex; flex-direction: column; padding: 12px; gap: 10px; overflow-y: auto; }
+        #hud-container { width: 320px; background: #131722; border-left: 1px solid #2a2e39; display: flex; flex-direction: column; padding: 12px; gap: 10px; overflow-y: auto; }
 
         .hud-card { background: #1e222d; border-radius: 6px; padding: 10px 12px; border: 1px solid #2a2e39; }
         .hud-title { font-size: 11px; color: #787b86; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; display: flex; justify-content: space-between; }
@@ -43,9 +44,10 @@
 <body>
     <header>
         <div class="logo-group">
-            <span>⚡ ETHUSDT SMC 策略哨兵 (1H)</span>
+            <span>⚡ ETHUSDT 策略哨兵 (1H)</span>
             <span id="conn-status" class="status-badge">連接中...</span>
         </div>
+        <!-- 這裡就是右上角的 Discord Webhook 控制列 -->
         <div class="webhook-controls">
             <input type="password" id="webhook-url" class="webhook-input" placeholder="貼上 Discord Webhook 網址">
             <button id="save-webhook" class="btn">儲存</button>
@@ -98,9 +100,6 @@
     </main>
 
     <script>
-        // ==========================================
-        // 1. 本地儲存與 Discord Webhook 推播模組
-        // ==========================================
         const webhookInput = document.getElementById('webhook-url');
         const saveWebhookBtn = document.getElementById('save-webhook');
         const testWebhookBtn = document.getElementById('test-webhook');
@@ -165,20 +164,17 @@
 
         testWebhookBtn.addEventListener('click', () => {
             if (!discordWebhookUrl) {
-                alert('請先填寫並儲存 Webhook 網址！');
+                alert('請先在輸入框貼上 Webhook 網址並點擊儲存！');
                 return;
             }
             sendDiscordAlert(
                 "🔔 測試訊號：SMC 哨兵連線正常",
-                "你的 ETH 即時監控網頁已經成功與此 Discord 頻道連線！後續只要出現開單與平倉訊號將會即時推播至此。",
+                "你的 ETH 即時監控網頁已經成功與 Discord 頻道建立連線！",
                 0x0ecb81,
                 [{ name: "監控標的", value: "ETHUSDT 永續合約", inline: true }, { name: "圖表週期", value: "1 小時 (1H)", inline: true }]
             );
         });
 
-        // ==========================================
-        // 2. 圖表初始化 (Lightweight Charts)
-        // ==========================================
         const chartContainer = document.getElementById('chart-container');
         const chart = LightweightCharts.createChart(chartContainer, {
             layout: { background: { color: '#0c0d10' }, textColor: '#848e9c' },
@@ -199,11 +195,8 @@
             chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
         });
 
-        // ==========================================
-        // 3. 數據計算與 SMC / 200 EMA / ADX 判斷
-        // ==========================================
         let klines = [];
-        let lastNotifiedSignalBar = 0; // 防重複推播鎖
+        let lastNotifiedSignalBar = 0;
 
         function calcEMA(data, period) {
             const k = 2 / (period + 1);
@@ -226,11 +219,9 @@
 
         function calcADX(data, period = 14) {
             if (data.length < period * 2) return 0;
-            // 簡易 ATR 與方向指標近似值
             let trSum = 0;
             for (let i = data.length - period; i < data.length; i++) {
-                const hl = data[i].high - data[i].low;
-                trSum += hl;
+                trSum += (data[i].high - data[i].low);
             }
             const atr = trSum / period;
             const netMove = Math.abs(data[data.length - 1].close - data[data.length - period].close);
@@ -245,7 +236,6 @@
             let smcEvent = "盤整蓄勢";
             let signalType = null;
 
-            // 突破最高/最低 (BOS 判定)
             if (latestBar.close > prevBar.high && isBullTrend && isTrendStrong) {
                 smcEvent = "多頭實體突破 (BOS)";
                 signalType = "BUY";
@@ -256,7 +246,6 @@
 
             document.getElementById('hud-smc-state').textContent = smcEvent;
 
-            // 達到新 K 棒訊號且未推播過
             if (signalType && latestBar.time !== lastNotifiedSignalBar) {
                 lastNotifiedSignalBar = latestBar.time;
                 const riskDist = Math.abs(latestBar.close - (signalType === "BUY" ? latestBar.low : latestBar.high));
@@ -265,23 +254,18 @@
 
                 sendDiscordAlert(
                     `🚨 觸發 SMC ${signalType} 開單訊號 (1:2)`,
-                    `ETHUSDT 1H 出現結構突破，且符合 200 EMA 宏觀順勢與 ADX 趨勢強度門檻！`,
+                    `ETHUSDT 1H 出現突破，符合 200 EMA 順勢與 ADX 強度門檻！`,
                     signalType === "BUY" ? 0x0ecb81 : 0xf6465d,
                     [
                         { name: "方向", value: signalType === "BUY" ? "🟢 做多 (LONG)" : "🔴 做空 (SHORT)", inline: true },
                         { name: "現價 (進場)", value: `$${latestBar.close.toFixed(2)}`, inline: true },
-                        { name: "200 EMA", value: `$${emaVal.toFixed(2)}`, inline: true },
-                        { name: "止盈目標 (TP 2R)", value: `$${tp.toFixed(2)}`, inline: true },
-                        { name: "嚴格止損 (SL 1R)", value: `$${sl.toFixed(2)}`, inline: true },
-                        { name: "ADX 趨勢強度", value: `${adxVal.toFixed(1)} (符合門檻)`, inline: true }
+                        { name: "止盈 (TP 2R)", value: `$${tp.toFixed(2)}`, inline: true },
+                        { name: "止損 (SL 1R)", value: `$${sl.toFixed(2)}`, inline: true }
                     ]
                 );
             }
         }
 
-        // ==========================================
-        // 4. 幣安 REST 歷史載入 + WebSocket 即時同步
-        // ==========================================
         async function initData() {
             try {
                 const res = await fetch('https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=1h&limit=300');
@@ -295,14 +279,13 @@
                 }));
 
                 candleSeries.setData(klines);
-
                 const emaData = calcEMA(klines, 200);
                 emaSeries.setData(emaData.filter(d => !isNaN(d.value)));
 
                 updateHUD(klines[klines.length - 1], emaData[emaData.length - 1].value);
                 initWebSocket();
             } catch (err) {
-                console.error('初始化歷史數據失敗:', err);
+                console.error('數據載入失敗:', err);
             }
         }
 
@@ -312,25 +295,15 @@
 
             const emaStatusEl = document.getElementById('hud-ema-status');
             if (emaVal) {
-                if (latest.close > emaVal) {
-                    emaStatusEl.textContent = "多頭管轄 (僅做多)";
-                    emaStatusEl.className = "hud-sub-desc val-bull";
-                } else {
-                    emaStatusEl.textContent = "空頭管轄 (僅做空)";
-                    emaStatusEl.className = "hud-sub-desc val-bear";
-                }
+                emaStatusEl.textContent = latest.close > emaVal ? "多頭管轄 (僅做多)" : "空頭管轄 (僅做空)";
+                emaStatusEl.className = latest.close > emaVal ? "hud-sub-desc val-bull" : "hud-sub-desc val-bear";
             }
 
             const adxVal = calcADX(klines, 14);
             const adxStatusEl = document.getElementById('hud-adx-status');
             document.getElementById('hud-adx').textContent = adxVal.toFixed(1);
-            if (adxVal >= 20) {
-                adxStatusEl.textContent = "趨勢明確 (允許開單)";
-                adxStatusEl.className = "hud-sub-desc val-bull";
-            } else {
-                adxStatusEl.textContent = "震盪死區 (禁止開單)";
-                adxStatusEl.className = "hud-sub-desc val-bear";
-            }
+            adxStatusEl.textContent = adxVal >= 20 ? "趨勢明確 (允許開單)" : "震盪死區 (禁止開單)";
+            adxStatusEl.className = adxVal >= 20 ? "hud-sub-desc val-bull" : "hud-sub-desc val-bear";
 
             if (klines.length > 2 && emaVal) {
                 evaluateSignalAndNotify(latest, klines[klines.length - 2], emaVal, adxVal);
@@ -359,7 +332,6 @@
                     };
 
                     candleSeries.update(bar);
-
                     if (klines[klines.length - 1].time === bar.time) {
                         klines[klines.length - 1] = bar;
                     } else {
@@ -369,13 +341,12 @@
                     const emaData = calcEMA(klines, 200);
                     const latestEma = emaData[emaData.length - 1].value;
                     emaSeries.update({ time: bar.time, value: latestEma });
-
                     updateHUD(bar, latestEma);
                 }
             };
 
             ws.onclose = () => {
-                statusBadge.textContent = "○ 斷線重連中...";
+                statusBadge.textContent = "○ 重連中...";
                 statusBadge.classList.remove('online');
                 setTimeout(initWebSocket, 3000);
             };
