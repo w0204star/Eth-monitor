@@ -329,10 +329,8 @@
     </div>
     
     <div class="header-right">
-      <!-- 尺規測量按鈕 (支援快捷鍵 Shift+拖曳) -->
       <button id="btn-measure-tool" class="btn-measure" onclick="toggleMeasureMode()" title="點擊切換測量工具，或直接在圖表按住 Shift 鍵拖曳">📏 測量</button>
 
-      <!-- 多空獨立開關控制群 -->
       <div class="switch-group">
         <button id="btn-toggle-long" class="btn-toggle-signal btn-toggle-long active" onclick="toggleSignal('LONG')">做多: 開</button>
         <button id="btn-toggle-short" class="btn-toggle-signal btn-toggle-short active" onclick="toggleSignal('SHORT')">做空: 開</button>
@@ -382,7 +380,6 @@
     </div>
     
     <aside>
-      <!-- 戰情儀表板 -->
       <div class="card">
         <div class="card-title">
           <span>戰情儀表板</span>
@@ -422,7 +419,6 @@
         </div>
       </div>
 
-      <!-- 🎵 音效控制中心 -->
       <div class="card">
         <div class="card-title">
           <span>🎵 警報音效設置</span>
@@ -452,7 +448,6 @@
         <button class="btn-audio-sub" style="width: 100%; margin-top: 8px;" onclick="resetCustomAudios()">🔄 重置為預設音效</button>
       </div>
 
-      <!-- 即時信號 -->
       <div class="card">
         <div class="card-title">即時信號狀態</div>
         <div class="metric-row">
@@ -469,7 +464,6 @@
         </div>
       </div>
 
-      <!-- 推播紀錄 -->
       <div class="card" style="flex: 1; display: flex; flex-direction: column;">
         <div class="card-title">訊號推播紀錄 (GMT+8)</div>
         <div id="log-list" class="log-box" style="flex:1;">
@@ -480,7 +474,7 @@
   </main>
 
   <script>
-    // ========== 0. 多空訊號開關控制 (支援本地保存) ==========
+    // ========== 0. 多空訊號開關控制 ==========
     let enableLongSignal = localStorage.getItem('eth_enable_long') !== 'false';
     let enableShortSignal = localStorage.getItem('eth_enable_short') !== 'false';
 
@@ -590,7 +584,7 @@
       alert('已送出測試訊息（包含 @everyone），請至 Discord 頻道查看！');
     }
 
-    // ========== 2. 純音效通知系統 (排他性單一播放機制) ==========
+    // ========== 2. 純音效通知系統 ==========
     let audioCtx = null;
     let audioEnabled = true;
     let alertVolume = parseFloat(localStorage.getItem('eth_alert_volume') || '0.8');
@@ -740,7 +734,7 @@
       }
     }
 
-    // ========== 3. 圖表初始化 (含主圖 + 底部成交量副圖) ==========
+    // ========== 3. 圖表初始化 ==========
     const chartContainer = document.getElementById('chart-container');
     const chart = LightweightCharts.createChart(chartContainer, {
       layout: { background: { color: '#0f121a' }, textColor: '#8b949e' },
@@ -788,7 +782,7 @@
       },
     });
 
-    // ========== 4. 尺規測量工具 (Measure Tool) 核心邏輯 ==========
+    // ========== 4. 尺規測量工具 (Measure Tool) ==========
     const measureCanvas = document.getElementById('measure-canvas');
     const measureCtx = measureCanvas.getContext('2d');
     const measureTooltip = document.getElementById('measure-tooltip');
@@ -796,8 +790,8 @@
 
     let isMeasureActive = false;
     let isMeasuring = false;
-    let measureStart = null; // { x, y, price, time }
-    let measureCurrent = null; // { x, y, price, time }
+    let measureStart = null;
+    let measureCurrent = null;
     let isShiftKeyDown = false;
 
     function resizeMeasureCanvas() {
@@ -847,7 +841,6 @@
     }
 
     chartWrapper.addEventListener('mousedown', (e) => {
-      // 支援點選按鈕啟動，或直接按住鍵盤 Shift 鍵開始測量
       if (isMeasureActive || isShiftKeyDown) {
         e.preventDefault();
         const pos = getMouseLogicalPos(e);
@@ -855,11 +848,9 @@
           isMeasuring = true;
           measureStart = pos;
           measureCurrent = pos;
-          // 鎖定圖表平移縮放，防止拉測量時跑版
           chart.applyOptions({ handleScroll: false, handleScale: false });
         }
       } else if (measureStart && !isMeasuring) {
-        // 點擊空白處清除之前的測量結果
         clearMeasurement();
       }
     });
@@ -876,7 +867,7 @@
         isMeasuring = false;
         chart.applyOptions({ handleScroll: true, handleScale: true });
         if (isMeasureActive && !isShiftKeyDown) {
-          toggleMeasureMode(); // 測量完成一次後自動釋放按鈕
+          toggleMeasureMode();
         }
       }
     });
@@ -900,11 +891,9 @@
       const fillColor = isPositive ? 'rgba(38, 166, 154, 0.18)' : 'rgba(239, 83, 80, 0.18)';
       const strokeColor = isPositive ? '#26a69a' : '#ef5350';
 
-      // 繪製半透明測量矩形選區
       measureCtx.fillStyle = fillColor;
       measureCtx.fillRect(x1, y1, width, height);
 
-      // 繪製對角線與邊框
       measureCtx.strokeStyle = strokeColor;
       measureCtx.lineWidth = 1.5;
       measureCtx.setLineDash([4, 4]);
@@ -916,7 +905,6 @@
       measureCtx.stroke();
       measureCtx.setLineDash([]);
 
-      // 計算跨越的 K 棒數量 (Bars) 與時間
       let barCount = 1;
       let timeDiffStr = "--";
       if (p1.time && p2.time && rawCandles.length > 0) {
@@ -930,7 +918,6 @@
         timeDiffStr = days > 0 ? `${days}天 ${hours}小時` : hours > 0 ? `${hours}小時 ${mins}分` : `${mins}分鐘`;
       }
 
-      // 更新並定位 Tooltip
       const sign = isPositive ? '+' : '';
       measureTooltip.innerHTML = `
         <div style="font-size: 0.92rem; font-weight: 700; color: ${strokeColor}; margin-bottom: 2px;">
@@ -943,7 +930,6 @@
       measureTooltip.style.borderColor = strokeColor;
       measureTooltip.style.display = 'block';
 
-      // 智慧浮動位置：避免跑出圖表右側或底端
       let tipX = p2.x + 12;
       let tipY = p2.y - 45;
       if (tipX + 180 > chartWrapper.clientWidth) tipX = p2.x - 190;
@@ -1019,10 +1005,11 @@
       return rsiArr;
     }
 
-    // ========== 6. 訊號與即時推播判定 (含多空開關) ==========
+    // ========== 6. 訊號推播與節流分析渲染 ==========
     let rawCandles = [];
     let notifiedSignals = new Set();
     let isInitialBoot = true;
+    let analysisTimer = null;
 
     function renderSignalToLog(type, price, sl, timestampSec) {
       document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
@@ -1042,6 +1029,15 @@
       logList.insertBefore(div, logList.firstChild);
     }
 
+    // 節流分析排程：避免在每秒數十次 Tick 時阻塞渲染
+    function scheduleAnalysis() {
+      if (analysisTimer) return;
+      analysisTimer = setTimeout(() => {
+        analysisTimer = null;
+        runAnalysisAndRender();
+      }, 150);
+    }
+
     function runAnalysisAndRender() {
       if (rawCandles.length < 50) return;
 
@@ -1054,13 +1050,6 @@
       fastEmaLine.setData(fastEma);
       slowEmaLine.setData(slowEma);
       macroEmaLine.setData(macroEma);
-
-      const volumeData = rawCandles.map(d => ({
-        time: d.time,
-        value: d.volume || 0,
-        color: d.close >= d.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
-      }));
-      volumeSeries.setData(volumeData);
 
       const markers = [];
       const detectedSignals = [];
@@ -1150,8 +1139,6 @@
       const curRsiVal = rsi[len - 1];
       const curAtrVal = atr[atr.length - 1];
 
-      document.getElementById('cur-price').innerText = last.close.toFixed(2) + ' U';
-      document.getElementById('cur-vol').innerText = last.volume ? (last.volume >= 1000 ? (last.volume / 1000).toFixed(2) + 'k' : last.volume.toFixed(1)) : '--';
       document.getElementById('cur-ema').innerText = curFast.toFixed(1) + ' / ' + curSlow.toFixed(1);
       document.getElementById('cur-ema200').innerText = curMacro.toFixed(1) + (last.close > curMacro ? ' (看多)' : ' (看空)');
       document.getElementById('cur-ema200').className = 'metric-val ' + (last.close > curMacro ? 'val-bull' : 'val-bear');
@@ -1231,6 +1218,14 @@
           }));
 
           candleSeries.setData(rawCandles);
+
+          const volumeData = rawCandles.map(d => ({
+            time: d.time,
+            value: d.volume || 0,
+            color: d.close >= d.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
+          }));
+          volumeSeries.setData(volumeData);
+
           chart.timeScale().fitContent();
           runAnalysisAndRender();
           resizeMeasureCanvas();
@@ -1251,52 +1246,76 @@
       }
     }
 
+    // ========== 8. 零延遲 WebSocket 即時跳動監聽 ==========
     function initWebSocket() {
-      const wsUrl = `wss://fstream.binance.com/ws/ethusdt@kline_${currentInterval}`;
-      activeWs = new WebSocket(wsUrl);
-      const statusEl = document.getElementById('conn-status');
+      // 優先使用合約即時頻道，若斷線自動切換
+      const wsUrls = [
+        `wss://fstream.binance.com/ws/ethusdt@kline_${currentInterval}`,
+        `wss://stream.binance.com:9443/ws/ethusdt@kline_${currentInterval}`
+      ];
+      
+      let urlIdx = 0;
+      function connect() {
+        activeWs = new WebSocket(wsUrls[urlIdx]);
+        const statusEl = document.getElementById('conn-status');
 
-      activeWs.onopen = () => {
-        statusEl.innerText = `即時連線 (${currentInterval})`;
-        statusEl.className = 'status-badge status-connected';
-      };
-
-      activeWs.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        const k = msg.k;
-        const candle = {
-          time: Math.floor(k.t / 1000),
-          open: parseFloat(k.o),
-          high: parseFloat(k.h),
-          low: parseFloat(k.l),
-          close: parseFloat(k.c),
-          volume: parseFloat(k.v)
+        activeWs.onopen = () => {
+          statusEl.innerText = `即時連線 (${currentInterval})`;
+          statusEl.className = 'status-badge status-connected';
         };
 
-        const last = rawCandles[rawCandles.length - 1];
-        if (last && last.time === candle.time) {
-          rawCandles[rawCandles.length - 1] = candle;
-        } else {
-          rawCandles.push(candle);
-        }
+        activeWs.onmessage = (event) => {
+          const msg = JSON.parse(event.data);
+          if (!msg || !msg.k) return;
+          const k = msg.k;
 
-        candleSeries.update(candle);
-        volumeSeries.update({
-          time: candle.time,
-          value: candle.volume,
-          color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
-        });
-        runAnalysisAndRender();
-      };
+          const candle = {
+            time: Math.floor(k.t / 1000),
+            open: parseFloat(k.o),
+            high: parseFloat(k.h),
+            low: parseFloat(k.l),
+            close: parseFloat(k.c),
+            volume: parseFloat(k.v)
+          };
 
-      activeWs.onerror = () => {
-        statusEl.innerText = '連線重試中...';
-        statusEl.className = 'status-badge status-connecting';
-      };
+          // 1. 第一毫秒直接繪製最新價與成交量，保證平滑跳動
+          candleSeries.update(candle);
+          volumeSeries.update({
+            time: candle.time,
+            value: candle.volume,
+            color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
+          });
 
-      activeWs.onclose = () => {
-        if (activeWs) setTimeout(initWebSocket, 4000);
-      };
+          // 2. 即時更新右側即時現價與量能面板
+          document.getElementById('cur-price').innerText = candle.close.toFixed(2) + ' U';
+          document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
+
+          // 3. 維護記憶體數據隊列
+          const last = rawCandles[rawCandles.length - 1];
+          if (last && last.time === candle.time) {
+            rawCandles[rawCandles.length - 1] = candle;
+          } else {
+            rawCandles.push(candle);
+          }
+
+          // 4. 節流調度後續指標運算
+          scheduleAnalysis();
+        };
+
+        activeWs.onerror = () => {
+          statusEl.innerText = '連線重試中...';
+          statusEl.className = 'status-badge status-connecting';
+        };
+
+        activeWs.onclose = () => {
+          if (activeWs) {
+            urlIdx = (urlIdx + 1) % wsUrls.length;
+            setTimeout(connect, 3000);
+          }
+        };
+      }
+
+      connect();
     }
 
     fetchHistoricalData();
