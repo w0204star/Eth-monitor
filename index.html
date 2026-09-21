@@ -19,41 +19,43 @@
     }
     header {
       background: #151924;
-      padding: 8px 16px;
+      padding: 6px 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #232733;
-      height: 52px;
-      gap: 10px;
+      height: 54px;
+      gap: 8px;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     
-    .symbol-select-container {
+    /* 幣種大按鈕切換組 */
+    .coin-switcher {
       display: flex;
-      align-items: center;
-      background: #0d1017;
-      border: 1px solid #282f42;
+      background: #090c12;
+      border: 1px solid #2c3245;
       border-radius: 6px;
-      padding: 2px 6px;
-      gap: 6px;
+      overflow: hidden;
+      padding: 2px;
+      gap: 2px;
     }
-    .symbol-icon { width: 20px; height: 20px; vertical-align: middle; }
-    .symbol-select {
+    .coin-btn {
       background: transparent;
       border: none;
-      color: #f0b90b;
-      font-size: 0.95rem;
+      color: #94a3b8;
+      padding: 6px 12px;
+      font-size: 0.85rem;
       font-weight: 700;
-      outline: none;
       cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
     }
-    .symbol-select option {
-      background: #151924;
-      color: #fff;
-    }
+    .coin-btn:hover { color: #fff; background: #1e2433; }
+    .coin-btn.active[data-coin="ETHUSDT"] { background: #627EEA; color: #fff; box-shadow: 0 0 8px rgba(98, 126, 234, 0.4); }
+    .coin-btn.active[data-coin="BTCUSDT"] { background: #F7931A; color: #fff; box-shadow: 0 0 8px rgba(247, 147, 26, 0.4); }
+    .coin-btn.active[data-coin="SOLUSDT"] { background: #9945FF; color: #fff; box-shadow: 0 0 8px rgba(153, 69, 255, 0.4); }
 
-    .status-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; border: 1px solid #33394d; font-weight: 600; white-space: nowrap; }
+    .status-badge { font-size: 0.72rem; padding: 3px 7px; border-radius: 8px; border: 1px solid #33394d; font-weight: 600; white-space: nowrap; }
     .status-connected { color: #00e676; background: rgba(0, 230, 118, 0.1); border-color: #00e676; }
     .status-connecting { color: #ffab00; background: rgba(255, 171, 0, 0.1); border-color: #ffab00; }
     .status-error { color: #ff5252; background: rgba(255, 82, 82, 0.1); border-color: #ff5252; }
@@ -62,7 +64,7 @@
     .webhook-group {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       background: #0d1017;
       padding: 3px 8px;
       border-radius: 6px;
@@ -73,7 +75,7 @@
       border: none;
       color: #fff;
       font-size: 0.75rem;
-      width: 120px;
+      width: 110px;
       outline: none;
     }
     .btn-dc {
@@ -81,7 +83,7 @@
       border: none;
       color: #fff;
       padding: 4px 8px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       border-radius: 4px;
       cursor: pointer;
       font-weight: 600;
@@ -92,7 +94,7 @@
       border: 1px solid #3b4254;
       color: #cbd5e1;
       padding: 4px 8px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       border-radius: 4px;
       cursor: pointer;
       font-weight: 600;
@@ -102,8 +104,8 @@
       background: #232733;
       border: 1px solid #3b4254;
       color: #cbd5e1;
-      padding: 5px 10px;
-      font-size: 0.8rem;
+      padding: 5px 9px;
+      font-size: 0.78rem;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
@@ -128,8 +130,8 @@
     .btn-toggle-signal {
       background: transparent;
       border: none;
-      padding: 5px 10px;
-      font-size: 0.78rem;
+      padding: 5px 9px;
+      font-size: 0.75rem;
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
@@ -151,8 +153,8 @@
       background: transparent;
       border: none;
       color: #8b949e;
-      padding: 6px 11px;
-      font-size: 0.8rem;
+      padding: 5px 9px;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
     }
@@ -164,8 +166,8 @@
       border: none;
       border-left: 1px solid #282f42;
       color: #8b949e;
-      padding: 6px 8px;
-      font-size: 0.8rem;
+      padding: 5px 7px;
+      font-size: 0.78rem;
       font-weight: 600;
       cursor: pointer;
       outline: none;
@@ -177,8 +179,8 @@
       background: #232733;
       border: 1px solid #3b4254;
       color: white;
-      padding: 6px 11px;
-      font-size: 0.8rem;
+      padding: 5px 10px;
+      font-size: 0.78rem;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
@@ -188,8 +190,8 @@
 
     main {
       display: grid;
-      grid-template-columns: 1fr 350px;
-      height: calc(100vh - 52px);
+      grid-template-columns: 1fr 340px;
+      height: calc(100vh - 54px);
       position: relative;
     }
     #chart-wrapper {
@@ -233,10 +235,10 @@
     aside {
       background: #131722;
       border-left: 1px solid #232733;
-      padding: 14px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       overflow-y: auto;
     }
     .card {
@@ -257,8 +259,8 @@
     .metric-row {
       display: flex;
       justify-content: space-between;
-      margin-bottom: 6px;
-      font-size: 0.85rem;
+      margin-bottom: 5px;
+      font-size: 0.84rem;
       align-items: center;
     }
     .metric-val { font-weight: 600; color: #fff; }
@@ -270,8 +272,8 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 8px;
-      font-size: 0.82rem;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
     }
     .slider-container {
       display: flex;
@@ -287,15 +289,15 @@
     .audio-action-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 6px;
+      gap: 6px;
+      margin-top: 5px;
     }
     .btn-audio-sub {
       background: #232733;
       border: 1px solid #3b4254;
       color: #e2e8f0;
-      padding: 5px 8px;
-      font-size: 0.75rem;
+      padding: 5px 7px;
+      font-size: 0.72rem;
       border-radius: 4px;
       cursor: pointer;
       font-weight: 600;
@@ -310,18 +312,18 @@
 
     .log-box {
       font-family: monospace;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       background: #0d1017;
       border: 1px solid #222634;
       border-radius: 6px;
-      padding: 8px;
-      max-height: 180px;
+      padding: 6px;
+      max-height: 160px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
-    .log-item { padding: 6px 8px; border-radius: 4px; line-height: 1.4; }
+    .log-item { padding: 5px 7px; border-radius: 4px; line-height: 1.4; }
     .log-long { background: rgba(38, 166, 154, 0.15); border-left: 3px solid #26a69a; }
     .log-short { background: rgba(239, 83, 80, 0.15); border-left: 3px solid #ef5350; }
   </style>
@@ -329,24 +331,18 @@
 <body onclick="initAudio()">
   <header>
     <div class="header-left">
-      <div class="symbol-select-container">
-        <svg id="current-coin-icon" class="symbol-icon" viewBox="0 0 32 32">
-          <circle cx="16" cy="16" r="16" fill="#627EEA"/>
-          <path fill="#FFF" fill-opacity=".6" d="M16.5 4v8.9l7.5 3.3zM16.5 22v6L24 17.6z"/>
-          <path fill="#FFF" d="M16.5 4L9 16.2l7.5-3.3zM16.5 28v-6L9 17.6z"/>
-        </svg>
-        <select id="symbol-selector" class="symbol-select" onchange="changeSymbol(this.value)">
-          <option value="ETHUSDT" selected>ETH/USDT</option>
-          <option value="BTCUSDT">BTC/USDT</option>
-          <option value="SOLUSDT">SOL/USDT</option>
-        </select>
+      <!-- ★ 幣種一鍵切換列 (ETH / BTC / SOL) -->
+      <div class="coin-switcher">
+        <button class="coin-btn active" data-coin="ETHUSDT" onclick="changeSymbol('ETHUSDT')">ETH</button>
+        <button class="coin-btn" data-coin="BTCUSDT" onclick="changeSymbol('BTCUSDT')">BTC</button>
+        <button class="coin-btn" data-coin="SOLUSDT" onclick="changeSymbol('SOLUSDT')">SOL</button>
       </div>
 
       <span id="conn-status" class="status-badge status-connecting">連線中...</span>
     </div>
     
     <div class="header-right">
-      <button id="btn-measure-tool" class="btn-measure" onclick="toggleMeasureMode()" title="點擊切換測量工具，或直接在圖表按住 Shift 鍵拖曳">📏 測量</button>
+      <button id="btn-measure-tool" class="btn-measure" onclick="toggleMeasureMode()" title="點擊切換測量工具，或在圖表按住 Shift 鍵拖曳">📏 測量</button>
 
       <div class="switch-group">
         <button id="btn-toggle-long" class="btn-toggle-signal btn-toggle-long active" onclick="toggleSignal('LONG')">做多: 開</button>
@@ -399,7 +395,7 @@
     <aside>
       <div class="card">
         <div class="card-title">
-          <span id="cur-panel-title">戰情儀表板 (ETH)</span>
+          <span id="cur-panel-title">戰情儀表板 (ETH/USDT)</span>
           <span id="cur-tf-label" style="color:#00e676;">15M 週期</span>
         </div>
         <div class="metric-row">
@@ -455,14 +451,14 @@
           <button class="btn-audio-sub btn-test-bear" onclick="playAlertSound('SELL', true)">▶ 試聽空單聲</button>
         </div>
 
-        <div class="audio-action-row" style="margin-top: 8px;">
+        <div class="audio-action-row" style="margin-top: 6px;">
           <input type="file" id="buy-audio-input" class="file-input-hidden" accept="audio/*" onchange="loadCustomAudio(event, 'BUY')" />
           <input type="file" id="sell-audio-input" class="file-input-hidden" accept="audio/*" onchange="loadCustomAudio(event, 'SELL')" />
           <button class="btn-audio-sub" onclick="document.getElementById('buy-audio-input').click()">📁 導入多單音檔</button>
           <button class="btn-audio-sub" onclick="document.getElementById('sell-audio-input').click()">📁 導入空單音檔</button>
         </div>
 
-        <button class="btn-audio-sub" style="width: 100%; margin-top: 8px;" onclick="resetCustomAudios()">🔄 重置為預設音效</button>
+        <button class="btn-audio-sub" style="width: 100%; margin-top: 6px;" onclick="resetCustomAudios()">🔄 重置為預設音效</button>
       </div>
 
       <div class="card">
@@ -494,33 +490,20 @@
     let currentSymbol = localStorage.getItem('crypto_selected_symbol') || 'ETHUSDT';
     let currentInterval = '15m';
 
-    const COIN_METAS = {
-      'ETHUSDT': {
-        name: 'ETH',
-        color: '#627EEA',
-        svg: `<circle cx="16" cy="16" r="16" fill="#627EEA"/><path fill="#FFF" fill-opacity=".6" d="M16.5 4v8.9l7.5 3.3zM16.5 22v6L24 17.6z"/><path fill="#FFF" d="M16.5 4L9 16.2l7.5-3.3zM16.5 28v-6L9 17.6z"/>`
-      },
-      'BTCUSDT': {
-        name: 'BTC',
-        color: '#F7931A',
-        svg: `<circle cx="16" cy="16" r="16" fill="#F7931A"/><path fill="#FFF" d="M22.8 13.7c.3-2.1-1.3-3.2-3.5-3.9l.7-2.9-1.8-.4-.7 2.8c-.5-.1-1-.2-1.5-.3l.7-2.9-1.8-.4-.7 2.9c-.4-.1-.8-.2-1.1-.3l-2.4-.6-.5 1.9s1.3.3 1.3.3c.7.2.8.7.8 1.1l-.8 3.3c.1 0 .1 0 .2.1l-.2-.1-1.1 4.6c-.1.2-.3.6-.8.4 0 0-1.3-.3-1.3-.3l-.9 2.1 2.3.6c.4.1.9.2 1.3.3l-.7 3 1.8.4.7-2.9c.5.1 1 .2 1.5.3l-.7 2.9 1.8.4.7-2.9c3.1.6 5.4.3 6.4-2.4.8-2.2 0-3.5-1.6-4.3 1.1-.3 2-1 2.2-2.5zm-3.9 5.4c-.6 2.3-4.5 1-5.7.8l1-4.1c1.3.3 5.3 1 4.7 3.3zm.6-5.5c-.5 2.1-3.7 1-4.7.8l.9-3.7c1 .3 4.3.8 3.8 2.9z"/>`
-      },
-      'SOLUSDT': {
-        name: 'SOL',
-        color: '#9945FF',
-        svg: `<circle cx="16" cy="16" r="16" fill="#000"/><path fill="url(#sol-grad)" d="M8 21.5h13.5l2.5-3H10.5zM10.5 13.5H24l-2.5-3H8zM8 7.5h13.5l2.5-3H10.5z"/><defs><linearGradient id="sol-grad" x1="8" y1="4.5" x2="24" y2="21.5" gradientUnits="userSpaceOnUse"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs>`
-      }
+    const COIN_NAMES = {
+      'ETHUSDT': 'ETH',
+      'BTCUSDT': 'BTC',
+      'SOLUSDT': 'SOL'
     };
 
-    function updateCoinHeaderUI() {
-      const meta = COIN_METAS[currentSymbol] || COIN_METAS['ETHUSDT'];
-      const iconEl = document.getElementById('current-coin-icon');
-      if (iconEl) iconEl.innerHTML = meta.svg;
+    function updateCoinUI() {
+      document.querySelectorAll('.coin-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-coin') === currentSymbol);
+      });
 
-      const titleEl = document.getElementById('cur-panel-title');
-      if (titleEl) titleEl.innerText = `戰情儀表板 (${meta.name})`;
-
-      document.title = `${meta.name}/USDT 專業監控中心 (GMT+8)`;
+      const name = COIN_NAMES[currentSymbol] || 'ETH';
+      document.getElementById('cur-panel-title').innerText = `戰情儀表板 (${name}/USDT)`;
+      document.title = `${name}/USDT 專業監控中心 (GMT+8)`;
     }
 
     function changeSymbol(newSymbol) {
@@ -528,7 +511,7 @@
       currentSymbol = newSymbol;
       localStorage.setItem('crypto_selected_symbol', currentSymbol);
 
-      updateCoinHeaderUI();
+      updateCoinUI();
       isInitialBoot = true;
       clearMeasurement();
       stopConnection();
@@ -601,7 +584,7 @@
       if (!discordWebhookUrl) return;
       const isBuy = type === "BUY";
       const gmt8Time = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
-      const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
+      const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
       const payload = {
         username: `${coinName} 策略哨兵 (GMT+8)`,
         content: "@everyone",
@@ -650,10 +633,7 @@
     let currentOscillator = null;
 
     document.addEventListener('DOMContentLoaded', () => {
-      const symbolSelect = document.getElementById('symbol-selector');
-      if (symbolSelect) symbolSelect.value = currentSymbol;
-      updateCoinHeaderUI();
-
+      updateCoinUI();
       const slider = document.getElementById('volume-slider');
       slider.value = Math.round(alertVolume * 100);
       document.getElementById('volume-val').innerText = slider.value + '%';
@@ -1068,7 +1048,7 @@
 
       const logList = document.getElementById('log-list');
       const timeStr = timestampSec ? formatGMT8Full(timestampSec) : formatGMT8Full(Math.floor(Date.now() / 1000));
-      const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
+      const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
       const div = document.createElement('div');
       div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
       div.innerHTML = `<strong>[${timeStr}] (${coinName} ${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
@@ -1235,7 +1215,6 @@
       fetchHistoricalData();
     }
 
-    // ========== 7. 數據獲取與多層容錯 WebSocket ==========
     let activeWs = null;
     let fallbackPollTimer = null;
     let lastWsMessageTime = 0;
@@ -1257,7 +1236,7 @@
 
     async function fetchHistoricalData() {
       const statusEl = document.getElementById('conn-status');
-      const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
+      const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
       statusEl.innerText = `讀取 ${coinName} ${currentInterval}...`;
       statusEl.className = 'status-badge status-connecting';
 
@@ -1312,18 +1291,12 @@
       }
     }
 
-    // 核心：即時 K 線更新處理器 (附帶防護校驗)
     function handleRealtimeCandle(candle) {
       if (!rawCandles || rawCandles.length === 0) return;
 
       const last = rawCandles[rawCandles.length - 1];
-      
-      // 防止時間倒流導致 Lightweight Charts 報錯
-      if (candle.time < last.time) {
-        return;
-      }
+      if (candle.time < last.time) return;
 
-      // 1. 即時畫上圖表 (保證 K 線會跳動)
       try {
         candleSeries.update(candle);
         volumeSeries.update({
@@ -1335,28 +1308,23 @@
         console.warn("圖表更新容錯:", err);
       }
 
-      // 2. 更新面板文字數值
       const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
       document.getElementById('cur-price').innerText = candle.close.toFixed(decimals) + ' U';
       document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
 
-      // 3. 維護本地歷史陣列
       if (last.time === candle.time) {
         rawCandles[rawCandles.length - 1] = candle;
       } else {
         rawCandles.push(candle);
       }
 
-      // 4. 排程計算指標
       scheduleAnalysis();
     }
 
-    // 雙通道 WebSocket + 輪詢保險絲
     function initRealtimeFeed() {
       stopConnection();
 
       const lowerSymbol = currentSymbol.toLowerCase();
-      // 期貨與現貨多條線路候補
       const candidateWsUrls = [
         `wss://fstream.binance.com/ws/${lowerSymbol}@kline_${currentInterval}`,
         `wss://stream.binance.com:9443/ws/${lowerSymbol}@kline_${currentInterval}`,
@@ -1370,7 +1338,7 @@
         const targetUrl = candidateWsUrls[candidateIdx];
         activeWs = new WebSocket(targetUrl);
         const statusEl = document.getElementById('conn-status');
-        const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
+        const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
 
         activeWs.onopen = () => {
           isWsAlive = true;
@@ -1403,7 +1371,6 @@
 
         activeWs.onclose = () => {
           isWsAlive = false;
-          // 切換至下一個備援線路
           candidateIdx = (candidateIdx + 1) % candidateWsUrls.length;
           setTimeout(connectWs, 2500);
         };
@@ -1411,9 +1378,8 @@
 
       connectWs();
 
-      // ★ 終極保險絲：若 WebSocket 被瀏覽器或防火牆阻擋 (超過 4 秒沒收到訊息)，自動啟動 REST 輪詢強制跳動
       fallbackPollTimer = setInterval(async () => {
-        if (Date.now() - lastWsMessageTime > 4000) {
+        if (Date.now() - lastWsMessageTime > 3500) {
           try {
             const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=2`);
             if (!res.ok) return;
@@ -1429,8 +1395,8 @@
                 volume: parseFloat(latest[5])
               };
               handleRealtimeCandle(candle);
-              document.getElementById('conn-status').innerText = `輪詢備援中 (${COIN_METAS[currentSymbol]?.name || currentSymbol})`;
-              document.getElementById('conn-status').className = 'status-badge status-connecting';
+              document.getElementById('conn-status').innerText = `輪詢更新中 (${COIN_NAMES[currentSymbol] || currentSymbol})`;
+              document.getElementById('conn-status').className = 'status-badge status-connected';
             }
           } catch (e) {}
         }
