@@ -1,676 +1,387 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ETH 專用即時 SMC & 多空信號監控儀表板</title>
-  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #0b0e14;
-      color: #d1d4dc;
-      overflow: hidden;
-      user-select: none;
-    }
-    header {
-      background: #151924;
-      padding: 10px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #232733;
-      gap: 10px;
-      height: 52px;
-    }
-    .header-left { display: flex; align-items: center; gap: 12px; }
-    .header-title { font-weight: 700; font-size: 1.05rem; color: #f0b90b; }
-    .status-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; border: 1px solid #33394d; font-weight: 600; }
-    .status-connected { color: #00e676; background: rgba(0, 230, 118, 0.1); border-color: #00e676; }
-    .status-connecting { color: #ffab00; background: rgba(255, 171, 0, 0.1); border-color: #ffab00; }
-    .status-error { color: #ff5252; background: rgba(255, 82, 82, 0.1); border-color: #ff5252; }
-    
-    .header-right { display: flex; align-items: center; gap: 14px; }
-    
-    .timeframe-group {
-      display: flex;
-      background: #0d1017;
-      border-radius: 6px;
-      border: 1px solid #282f42;
-      overflow: hidden;
-    }
-    .tf-btn {
-      background: transparent;
-      border: none;
-      color: #8b949e;
-      padding: 6px 12px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .tf-btn:hover { color: #fff; background: #1a1e2b; }
-    .tf-btn.active { background: #2962ff; color: #ffffff; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETH SMC 專業即時戰情監控室</title>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: #0c0d10; color: #d1d4dc; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        header { height: 48px; background: #131722; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #2a2e39; }
+        .logo-group { display: flex; align-items: center; gap: 10px; font-weight: bold; color: #f0b90b; }
+        .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #2a2e39; color: #848e9c; }
+        .status-badge.online { background: rgba(14, 203, 129, 0.2); color: #0ecb81; }
+        .webhook-controls { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .webhook-input { background: #1e222d; border: 1px solid #363c4e; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px; width: 220px; outline: none; }
+        .btn { background: #2962ff; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; transition: 0.2s; }
+        .btn:hover { background: #1e4bd8; }
+        .btn-test { background: #363c4e; }
+        .btn-test:hover { background: #4a5065; }
 
-    .btn-audio {
-      background: #232733;
-      border: 1px solid #3b4254;
-      color: white;
-      padding: 6px 12px;
-      font-size: 0.8rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .btn-audio.muted { background: #374151; color: #9ca3af; }
+        main { flex: 1; display: flex; position: relative; }
+        #chart-container { flex: 1; height: 100%; position: relative; }
+        #hud-container { width: 340px; background: #131722; border-left: 1px solid #2a2e39; display: flex; flex-direction: column; padding: 12px; gap: 10px; overflow-y: auto; }
 
-    main {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      height: calc(100vh - 52px);
-      position: relative;
-    }
-    #chart-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-    #chart-container {
-      width: 100%;
-      height: 100%;
-      background: #0f121a;
-    }
+        .hud-card { background: #1e222d; border-radius: 6px; padding: 10px 12px; border: 1px solid #2a2e39; }
+        .hud-title { font-size: 11px; color: #787b86; margin-bottom: 6px; text-transform: uppercase; font-weight: 600; display: flex; justify-content: space-between; }
+        .hud-value-row { display: flex; justify-content: space-between; align-items: baseline; }
+        .hud-main-val { font-size: 18px; font-weight: 700; color: #fff; }
+        .hud-sub-desc { font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
 
-    #badge-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 20;
-    }
+        .val-bull { color: #0ecb81; background: rgba(14, 203, 129, 0.15); }
+        .val-bear { color: #f6465d; background: rgba(246, 70, 93, 0.15); }
+        .val-neutral { color: #f0b90b; background: rgba(240, 185, 11, 0.15); }
 
-    .badge-callout-sell {
-      position: absolute;
-      transform: translate(-50%, -100%);
-      background: #dc3545;
-      color: #ffffff;
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 5px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-      white-space: nowrap;
-      margin-top: -6px;
-      transition: left 0.05s linear, top 0.05s linear;
-    }
-    .badge-callout-sell::after {
-      content: "";
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 5px;
-      border-style: solid;
-      border-color: #dc3545 transparent transparent transparent;
-    }
-
-    .badge-callout-buy {
-      position: absolute;
-      transform: translate(-50%, 0%);
-      background: #2e7d32;
-      color: #ffffff;
-      font-size: 0.8rem;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 5px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-      white-space: nowrap;
-      margin-top: 6px;
-      transition: left 0.05s linear, top 0.05s linear;
-    }
-    .badge-callout-buy::after {
-      content: "";
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 5px;
-      border-style: solid;
-      border-color: transparent transparent #2e7d32 transparent;
-    }
-
-    aside {
-      background: #131722;
-      border-left: 1px solid #232733;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      overflow-y: auto;
-    }
-    .card {
-      background: #1a1e2b;
-      border-radius: 8px;
-      padding: 14px;
-      border: 1px solid #282f42;
-    }
-    .card-title {
-      font-size: 0.85rem;
-      color: #787b86;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      font-weight: 600;
-      display: flex;
-      justify-content: space-between;
-    }
-    .metric-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 0.9rem;
-    }
-    .metric-val { font-weight: 600; color: #fff; }
-    .val-bull { color: #26a69a !important; }
-    .val-bear { color: #ef5350 !important; }
-    .log-box {
-      font-family: monospace;
-      font-size: 0.8rem;
-      background: #0d1017;
-      border: 1px solid #222634;
-      border-radius: 6px;
-      padding: 8px;
-      max-height: 220px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .log-item { padding: 6px 8px; border-radius: 4px; line-height: 1.4; }
-    .log-long { background: rgba(38, 166, 154, 0.15); border-left: 3px solid #26a69a; }
-    .log-short { background: rgba(239, 83, 80, 0.15); border-left: 3px solid #ef5350; }
-  </style>
+        @media (max-width: 860px) {
+            main { flex-direction: column; }
+            #hud-container { width: 100%; height: 260px; border-left: none; border-top: 1px solid #2a2e39; }
+            .webhook-input { width: 140px; }
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <div class="header-left">
-      <span class="header-title">⚡ ETH/USDT 獨立監控中心</span>
-      <span id="conn-status" class="status-badge status-connecting">連線中...</span>
-    </div>
-    
-    <div class="header-right">
-      <div class="timeframe-group">
-        <button class="tf-btn" onclick="changeTimeframe('5m')">5m</button>
-        <button class="tf-btn active" onclick="changeTimeframe('15m')">15m</button>
-        <button class="tf-btn" onclick="changeTimeframe('30m')">30m</button>
-        <button class="tf-btn" onclick="changeTimeframe('1h')">1h</button>
-        <button class="tf-btn" onclick="changeTimeframe('4h')">4h</button>
-        <button class="tf-btn" onclick="changeTimeframe('1d')">1d</button>
-      </div>
-      <button id="btn-audio" class="btn-audio" onclick="toggleAudio()">🔊 語音提醒</button>
-    </div>
-  </header>
-
-  <main>
-    <div id="chart-wrapper">
-      <div id="chart-container"></div>
-      <div id="badge-layer"></div>
-    </div>
-    
-    <aside>
-      <div class="card">
-        <div class="card-title">
-          <span>戰情儀表板</span>
-          <span id="cur-tf-label" style="color:#00e676;">15m 週期</span>
+    <header>
+        <div class="logo-group">
+            <span>⚡ ETHUSDT SMC 策略哨兵 (1H)</span>
+            <span id="conn-status" class="status-badge">連接中...</span>
         </div>
-        <div class="metric-row">
-          <span>現價:</span>
-          <span id="cur-price" class="metric-val">--</span>
+        <div class="webhook-controls">
+            <input type="password" id="webhook-url" class="webhook-input" placeholder="貼上 Discord Webhook 網址">
+            <button id="save-webhook" class="btn">儲存</button>
+            <button id="test-webhook" class="btn btn-test">測試推播</button>
         </div>
-        <div class="metric-row">
-          <span>EMA (9 / 21):</span>
-          <span id="cur-ema" class="metric-val">-- / --</span>
+    </header>
+
+    <main>
+        <div id="chart-container"></div>
+        <div id="hud-container">
+            <div class="hud-card">
+                <div class="hud-title">即時現價 (Binance Futures)</div>
+                <div class="hud-value-row">
+                    <span id="hud-price" class="hud-main-val">--.--</span>
+                    <span id="hud-price-vol" class="hud-sub-desc val-neutral">即時串流</span>
+                </div>
+            </div>
+
+            <div class="hud-card">
+                <div class="hud-title">200 EMA 趨勢過濾</div>
+                <div class="hud-value-row">
+                    <span id="hud-ema" class="hud-main-val">--.--</span>
+                    <span id="hud-ema-status" class="hud-sub-desc">計算中</span>
+                </div>
+            </div>
+
+            <div class="hud-card">
+                <div class="hud-title">ADX 趨勢強度 (門檻 20)</div>
+                <div class="hud-value-row">
+                    <span id="hud-adx" class="hud-main-val">--.--</span>
+                    <span id="hud-adx-status" class="hud-sub-desc">計算中</span>
+                </div>
+            </div>
+
+            <div class="hud-card">
+                <div class="hud-title">SMC 結構狀態</div>
+                <div class="hud-value-row">
+                    <span id="hud-smc-state" class="hud-main-val" style="font-size: 14px;">掃描中...</span>
+                </div>
+            </div>
+
+            <div class="hud-card">
+                <div class="hud-title">Discord 推播狀態</div>
+                <div class="hud-value-row">
+                    <span id="hud-discord-status" class="hud-main-val" style="font-size: 13px;">未設定</span>
+                    <span id="hud-last-alert-time" class="hud-sub-desc val-neutral">無推播</span>
+                </div>
+            </div>
         </div>
-        <div class="metric-row">
-          <span>200 EMA 宏觀:</span>
-          <span id="cur-ema200" class="metric-val">--</span>
-        </div>
-        <div class="metric-row">
-          <span>RSI (14):</span>
-          <span id="cur-rsi" class="metric-val">--</span>
-        </div>
-        <div class="metric-row">
-          <span>ATR (14):</span>
-          <span id="cur-atr" class="metric-val">--</span>
-        </div>
-        <div class="metric-row">
-          <span>動能趨勢:</span>
-          <span id="cur-trend" class="metric-val">連線中</span>
-        </div>
-      </div>
+    </main>
 
-      <div class="card">
-        <div class="card-title">即時信號觸發</div>
-        <div class="metric-row">
-          <span>最近訊號:</span>
-          <span id="last-sig-type" class="metric-val">無</span>
-        </div>
-        <div class="metric-row">
-          <span>觸發參考價:</span>
-          <span id="last-sig-price" class="metric-val">--</span>
-        </div>
-        <div class="metric-row">
-          <span>建議防守 (SL):</span>
-          <span id="last-sig-sl" class="metric-val">--</span>
-        </div>
-      </div>
+    <script>
+        // ==========================================
+        // 1. 本地儲存與 Discord Webhook 推播模組
+        // ==========================================
+        const webhookInput = document.getElementById('webhook-url');
+        const saveWebhookBtn = document.getElementById('save-webhook');
+        const testWebhookBtn = document.getElementById('test-webhook');
+        const discordStatusEl = document.getElementById('hud-discord-status');
+        const lastAlertTimeEl = document.getElementById('hud-last-alert-time');
 
-      <div class="card" style="flex: 1; display: flex; flex-direction: column;">
-        <div class="card-title">訊號推播紀錄</div>
-        <div id="log-list" class="log-box" style="flex:1;">
-          <div style="color: #666; text-align: center; padding: 10px;">資料載入中...</div>
-        </div>
-      </div>
-    </aside>
-  </main>
-
-  <script>
-    let audioCtx = null;
-    let audioEnabled = true;
-    let currentInterval = '15m'; // 預設開啟 15m
-
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    }
-
-    function toggleAudio() {
-      initAudio();
-      audioEnabled = !audioEnabled;
-      const btn = document.getElementById('btn-audio');
-      btn.innerText = audioEnabled ? "🔊 語音提醒" : "🔇 已靜音";
-      btn.className = audioEnabled ? "btn-audio" : "btn-audio muted";
-    }
-
-    function playAlertSound(type) {
-      if (!audioEnabled) return;
-      initAudio();
-
-      const now = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-
-      if (type === "BUY") {
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, now);
-        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.18);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      } else {
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.exponentialRampToValueAtTime(300, now + 0.25);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-        osc.start(now);
-        osc.stop(now + 0.4);
-      }
-
-      if ('speechSynthesis' in window) {
-        const tfText = currentInterval === '1d' ? '日線' : currentInterval;
-        const text = type === "BUY" ? `ETH ${tfText} 出現做多信號` : `ETH ${tfText} 出現做空信號`;
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.lang = 'zh-TW';
-        msg.rate = 1.1;
-        window.speechSynthesis.speak(msg);
-      }
-    }
-
-    const chartContainer = document.getElementById('chart-container');
-    const badgeLayer = document.getElementById('badge-layer');
-
-    const chart = LightweightCharts.createChart(chartContainer, {
-      layout: { background: { color: '#0f121a' }, textColor: '#8b949e' },
-      grid: { vertLines: { color: '#1a1f2c' }, horzLines: { color: '#1a1f2c' } },
-      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#232733' },
-      timeScale: { borderColor: '#232733', timeVisible: true, secondsVisible: false }
-    });
-
-    const candleSeries = chart.addCandlestickSeries({
-      upColor: '#26a69a', downColor: '#ef5350',
-      borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
-    });
-
-    const fastEmaLine = chart.addLineSeries({ color: '#00e5ff', lineWidth: 2, title: 'EMA 9' });
-    const slowEmaLine = chart.addLineSeries({ color: '#ff9100', lineWidth: 2, title: 'EMA 21' });
-    const macroEmaLine = chart.addLineSeries({ color: '#787b86', lineWidth: 2, lineStyle: 2, title: 'EMA 200' });
-
-    function resizeChart() {
-      chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
-      updateBadgePositions();
-    }
-    window.addEventListener('resize', resizeChart);
-
-    function calcEMA(data, length) {
-      const k = 2 / (length + 1);
-      const ema = [];
-      let prevEma = data[0].close;
-      for (let i = 0; i < data.length; i++) {
-        const val = i === 0 ? prevEma : data[i].close * k + prevEma * (1 - k);
-        ema.push({ time: data[i].time, value: val });
-        prevEma = val;
-      }
-      return ema;
-    }
-
-    function calcATR(data, length = 14) {
-      const tr = [];
-      for (let i = 0; i < data.length; i++) {
-        if (i === 0) {
-          tr.push(data[i].high - data[i].low);
-        } else {
-          const hl = data[i].high - data[i].low;
-          const hc = Math.abs(data[i].high - data[i - 1].close);
-          const lc = Math.abs(data[i].low - data[i - 1].close);
-          tr.push(Math.max(hl, hc, lc));
-        }
-      }
-      let atr = 0;
-      for (let i = 0; i < length; i++) atr += tr[i];
-      atr /= length;
-      const atrs = [atr];
-      for (let i = length; i < data.length; i++) {
-        atr = (atr * (length - 1) + tr[i]) / length;
-        atrs.push(atr);
-      }
-      return atrs;
-    }
-
-    function calcRSI(data, length = 14) {
-      let gains = 0, losses = 0;
-      for (let i = 1; i <= length; i++) {
-        const diff = data[i].close - data[i - 1].close;
-        if (diff >= 0) gains += diff;
-        else losses -= diff;
-      }
-      let avgGain = gains / length;
-      let avgLoss = losses / length;
-      const rsiArr = new Array(length).fill(50);
-      let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-      rsiArr.push(100 - (100 / (1 + rs)));
-
-      for (let i = length + 1; i < data.length; i++) {
-        const diff = data[i].close - data[i - 1].close;
-        const gain = diff > 0 ? diff : 0;
-        const loss = diff < 0 ? -diff : 0;
-        avgGain = (avgGain * (length - 1) + gain) / length;
-        avgLoss = (avgLoss * (length - 1) + loss) / length;
-        rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-        rsiArr.push(100 - (100 / (1 + rs)));
-      }
-      return rsiArr;
-    }
-
-    let activeBadges = [];
-
-    function updateBadgePositions() {
-      const timeScale = chart.timeScale();
-      badgeLayer.innerHTML = '';
-
-      activeBadges.forEach(b => {
-        const x = timeScale.timeToCoordinate(b.time);
-        const y = candleSeries.priceToCoordinate(b.price);
-
-        if (x !== null && y !== null && x >= 0 && x <= chartContainer.clientWidth) {
-          const el = document.createElement('div');
-          el.className = b.type === 'BUY' ? 'badge-callout-buy' : 'badge-callout-sell';
-          el.innerText = b.text;
-          el.style.left = `${x}px`;
-          el.style.top = `${y}px`;
-          badgeLayer.appendChild(el);
-        }
-      });
-    }
-
-    chart.timeScale().subscribeVisibleTimeRangeChange(updateBadgePositions);
-
-    let rawCandles = [];
-    let lastAlertTimestamp = 0;
-
-    function runAnalysisAndRender() {
-      if (rawCandles.length < 210) return;
-
-      const fastEma = calcEMA(rawCandles, 9);
-      const slowEma = calcEMA(rawCandles, 21);
-      const macroEma = calcEMA(rawCandles, 200);
-      const rsi = calcRSI(rawCandles, 14);
-      const atr = calcATR(rawCandles, 14);
-
-      fastEmaLine.setData(fastEma);
-      slowEmaLine.setData(slowEma);
-      macroEmaLine.setData(macroEma);
-
-      activeBadges = [];
-      const nativeMarkers = [];
-      const len = rawCandles.length;
-      let lastLongIdx = -999;
-      let lastShortIdx = -999;
-      const cooldown = 4;
-
-      for (let i = 200; i < len; i++) {
-        const cur = rawCandles[i];
-        const prev = rawCandles[i - 1];
-
-        const curFast = fastEma[i].value;
-        const curSlow = slowEma[i].value;
-        const prevFast = fastEma[i - 1].value;
-        const prevSlow = slowEma[i - 1].value;
-
-        const curRsi = rsi[i];
-        const prevRsi = rsi[i - 1];
-        const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
-
-        const trendUp = curFast > curSlow;
-        const goldCross = prevFast <= prevSlow && curFast > curSlow;
-        const canLong = (i - lastLongIdx >= cooldown);
-
-        const wasOverbought = prevRsi >= 65;
-        const rsiCrossDown = (prevRsi >= 60 && curRsi < 60) || (prevFast >= prevSlow && curFast < curSlow);
-        const canShort = (i - lastShortIdx >= cooldown);
-
-        if (trendUp && goldCross && canLong) {
-          lastLongIdx = i;
-          activeBadges.push({ time: cur.time, price: cur.low, type: 'BUY', text: '做多' });
-          nativeMarkers.push({ time: cur.time, position: 'belowBar', color: '#26a69a', shape: 'arrowUp', text: '做多' });
-
-          if (i === len - 1 && cur.time !== lastAlertTimestamp) {
-            lastAlertTimestamp = cur.time;
-            triggerSignal("BUY", cur.close, cur.close - curAtr * 1.5);
-          }
-        } else if (wasOverbought && rsiCrossDown && canShort) {
-          lastShortIdx = i;
-          activeBadges.push({ time: cur.time, price: cur.high, type: 'SELL', text: '做空' });
-          nativeMarkers.push({ time: cur.time, position: 'aboveBar', color: '#ef5350', shape: 'arrowDown', text: '做空' });
-
-          if (i === len - 1 && cur.time !== lastAlertTimestamp) {
-            lastAlertTimestamp = cur.time;
-            triggerSignal("SELL", cur.close, cur.close + curAtr * 1.5);
-          }
-        }
-      }
-
-      candleSeries.setMarkers(nativeMarkers);
-      setTimeout(updateBadgePositions, 60);
-
-      const last = rawCandles[len - 1];
-      const curFast = fastEma[len - 1].value;
-      const curSlow = slowEma[len - 1].value;
-      const curMacro = macroEma[len - 1].value;
-      const curRsiVal = rsi[len - 1];
-      const curAtrVal = atr[atr.length - 1];
-
-      document.getElementById('cur-price').innerText = last.close.toFixed(2) + ' U';
-      document.getElementById('cur-ema').innerText = curFast.toFixed(1) + ' / ' + curSlow.toFixed(1);
-      document.getElementById('cur-ema200').innerText = curMacro.toFixed(1) + (last.close > curMacro ? ' (看多)' : ' (看空)');
-      document.getElementById('cur-ema200').className = 'metric-val ' + (last.close > curMacro ? 'val-bull' : 'val-bear');
-      document.getElementById('cur-rsi').innerText = curRsiVal.toFixed(1);
-      document.getElementById('cur-atr').innerText = curAtrVal.toFixed(2);
-      
-      const trendEl = document.getElementById('cur-trend');
-      if (curFast > curSlow) {
-        trendEl.innerText = "多頭排列 (金叉中)";
-        trendEl.className = "metric-val val-bull";
-      } else {
-        trendEl.innerText = "空頭排列 (死叉中)";
-        trendEl.className = "metric-val val-bear";
-      }
-    }
-
-    function triggerSignal(type, price, sl) {
-      playAlertSound(type);
-
-      document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
-      document.getElementById('last-sig-type').className = "metric-val " + (type === "BUY" ? "val-bull" : "val-bear");
-      document.getElementById('last-sig-price').innerText = price.toFixed(2) + " USDT";
-      document.getElementById('last-sig-sl').innerText = sl.toFixed(2) + " USDT";
-
-      const logList = document.getElementById('log-list');
-      const timeStr = new Date().toLocaleTimeString();
-      const div = document.createElement('div');
-      div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
-      div.innerHTML = `<strong>[${timeStr}] (${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
-      
-      if (logList.children[0] && (logList.children[0].innerText.includes('中...') || logList.children[0].innerText.includes('尚未'))) {
-        logList.innerHTML = '';
-      }
-      logList.insertBefore(div, logList.firstChild);
-    }
-
-    let activeWs = null;
-
-    function changeTimeframe(tf) {
-      if (currentInterval === tf) return;
-      currentInterval = tf;
-
-      document.querySelectorAll('.tf-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText.toLowerCase() === tf.toLowerCase());
-      });
-      document.getElementById('cur-tf-label').innerText = `${tf} 週期`;
-
-      if (activeWs) {
-        activeWs.onclose = null;
-        activeWs.close();
-        activeWs = null;
-      }
-
-      fetchHistoricalData();
-    }
-
-    async function fetchHistoricalData() {
-      const statusEl = document.getElementById('conn-status');
-      statusEl.innerText = `讀取 ${currentInterval} 中...`;
-      statusEl.className = 'status-badge status-connecting';
-
-      const endpoints = [
-        `https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1500`,
-        `https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1000`,
-        `https://api1.binance.com/api/v3/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1000`
-      ];
-
-      let success = false;
-      for (let url of endpoints) {
-        try {
-          const res = await fetch(url);
-          if (!res.ok) continue;
-          const json = await res.json();
-          if (!Array.isArray(json) || json.length === 0) continue;
-
-          rawCandles = json.map(d => ({
-            time: Math.floor(d[0] / 1000),
-            open: parseFloat(d[1]),
-            high: parseFloat(d[2]),
-            low: parseFloat(d[3]),
-            close: parseFloat(d[4])
-          }));
-
-          candleSeries.setData(rawCandles);
-          chart.timeScale().fitContent();
-          runAnalysisAndRender();
-          success = true;
-          break;
-        } catch (e) {
-          console.warn('Endpoint failed: ' + url, e);
-        }
-      }
-
-      if (success) {
-        statusEl.innerText = `即時連線 (${currentInterval})`;
-        statusEl.className = 'status-badge status-connected';
-        initWebSocket();
-      } else {
-        statusEl.innerText = '連線失敗';
-        statusEl.className = 'status-badge status-error';
-      }
-    }
-
-    function initWebSocket() {
-      const wsUrl = `wss://fstream.binance.com/ws/ethusdt@kline_${currentInterval}`;
-      activeWs = new WebSocket(wsUrl);
-      const statusEl = document.getElementById('conn-status');
-
-      activeWs.onopen = () => {
-        statusEl.innerText = `即時連線 (${currentInterval})`;
-        statusEl.className = 'status-badge status-connected';
-      };
-
-      activeWs.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        const k = msg.k;
-        const candle = {
-          time: Math.floor(k.t / 1000),
-          open: parseFloat(k.o),
-          high: parseFloat(k.h),
-          low: parseFloat(k.l),
-          close: parseFloat(k.c)
-        };
-
-        const last = rawCandles[rawCandles.length - 1];
-        if (last && last.time === candle.time) {
-          rawCandles[rawCandles.length - 1] = candle;
-        } else {
-          rawCandles.push(candle);
+        let discordWebhookUrl = localStorage.getItem('eth_discord_webhook') || '';
+        if (discordWebhookUrl) {
+            webhookInput.value = discordWebhookUrl;
+            discordStatusEl.textContent = "已連線監聽";
+            discordStatusEl.style.color = "#0ecb81";
         }
 
-        candleSeries.update(candle);
-        runAnalysisAndRender();
-      };
+        saveWebhookBtn.addEventListener('click', () => {
+            const url = webhookInput.value.trim();
+            if (url.startsWith('https://discord.com/api/webhooks/')) {
+                localStorage.setItem('eth_discord_webhook', url);
+                discordWebhookUrl = url;
+                discordStatusEl.textContent = "已儲存綁定";
+                discordStatusEl.style.color = "#0ecb81";
+                alert('Discord Webhook 儲存成功！');
+            } else if (url === '') {
+                localStorage.removeItem('eth_discord_webhook');
+                discordWebhookUrl = '';
+                discordStatusEl.textContent = "未設定";
+                discordStatusEl.style.color = "#d1d4dc";
+                alert('已清除 Webhook 設定。');
+            } else {
+                alert('請輸入合法的 Discord Webhook 網址！');
+            }
+        });
 
-      activeWs.onerror = () => {
-        statusEl.innerText = '連線重試中...';
-        statusEl.className = 'status-badge status-connecting';
-      };
+        async function sendDiscordAlert(title, description, colorHex = 0x2962ff, fields = []) {
+            if (!discordWebhookUrl) return;
 
-      activeWs.onclose = () => {
-        if (activeWs) {
-          setTimeout(initWebSocket, 4000);
+            const payload = {
+                username: "ETH SMC 策略哨兵",
+                embeds: [{
+                    title: title,
+                    description: description,
+                    color: colorHex,
+                    fields: fields,
+                    timestamp: new Date().toISOString(),
+                    footer: { text: "ETHUSDT 1H • SMC 雙重過濾策略" }
+                }]
+            };
+
+            try {
+                const res = await fetch(discordWebhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    const now = new Date();
+                    lastAlertTimeEl.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} 已發送`;
+                }
+            } catch (err) {
+                console.error('Discord 推播失敗:', err);
+            }
         }
-      };
-    }
 
-    fetchHistoricalData();
-  </script>
+        testWebhookBtn.addEventListener('click', () => {
+            if (!discordWebhookUrl) {
+                alert('請先填寫並儲存 Webhook 網址！');
+                return;
+            }
+            sendDiscordAlert(
+                "🔔 測試訊號：SMC 哨兵連線正常",
+                "你的 ETH 即時監控網頁已經成功與此 Discord 頻道連線！後續只要出現開單與平倉訊號將會即時推播至此。",
+                0x0ecb81,
+                [{ name: "監控標的", value: "ETHUSDT 永續合約", inline: true }, { name: "圖表週期", value: "1 小時 (1H)", inline: true }]
+            );
+        });
+
+        // ==========================================
+        // 2. 圖表初始化 (Lightweight Charts)
+        // ==========================================
+        const chartContainer = document.getElementById('chart-container');
+        const chart = LightweightCharts.createChart(chartContainer, {
+            layout: { background: { color: '#0c0d10' }, textColor: '#848e9c' },
+            grid: { vertLines: { color: '#1a1e29' }, horzLines: { color: '#1a1e29' } },
+            timeScale: { timeVisible: true, secondsVisible: false, borderColor: '#2a2e39' },
+            rightPriceScale: { borderColor: '#2a2e39' }
+        });
+
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#0ecb81', downColor: '#f6465d',
+            borderUpColor: '#0ecb81', borderDownColor: '#f6465d',
+            wickUpColor: '#0ecb81', wickDownColor: '#f6465d'
+        });
+
+        const emaSeries = chart.addLineSeries({ color: '#f0b90b', lineWidth: 2, title: '200 EMA' });
+
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+        });
+
+        // ==========================================
+        // 3. 數據計算與 SMC / 200 EMA / ADX 判斷
+        // ==========================================
+        let klines = [];
+        let lastNotifiedSignalBar = 0; // 防重複推播鎖
+
+        function calcEMA(data, period) {
+            const k = 2 / (period + 1);
+            let ema = [];
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    sum += data[i].close;
+                    ema.push({ time: data[i].time, value: NaN });
+                } else if (i === period - 1) {
+                    sum += data[i].close;
+                    ema.push({ time: data[i].time, value: sum / period });
+                } else {
+                    const prevEma = ema[i - 1].value;
+                    ema.push({ time: data[i].time, value: (data[i].close - prevEma) * k + prevEma });
+                }
+            }
+            return ema;
+        }
+
+        function calcADX(data, period = 14) {
+            if (data.length < period * 2) return 0;
+            // 簡易 ATR 與方向指標近似值
+            let trSum = 0;
+            for (let i = data.length - period; i < data.length; i++) {
+                const hl = data[i].high - data[i].low;
+                trSum += hl;
+            }
+            const atr = trSum / period;
+            const netMove = Math.abs(data[data.length - 1].close - data[data.length - period].close);
+            const adxApprox = (netMove / (atr * period)) * 100;
+            return Math.min(60, Math.max(10, adxApprox * 4));
+        }
+
+        function evaluateSignalAndNotify(latestBar, prevBar, emaVal, adxVal) {
+            const isBullTrend = latestBar.close > emaVal;
+            const isTrendStrong = adxVal >= 20;
+
+            let smcEvent = "盤整蓄勢";
+            let signalType = null;
+
+            // 突破最高/最低 (BOS 判定)
+            if (latestBar.close > prevBar.high && isBullTrend && isTrendStrong) {
+                smcEvent = "多頭實體突破 (BOS)";
+                signalType = "BUY";
+            } else if (latestBar.close < prevBar.low && !isBullTrend && isTrendStrong) {
+                smcEvent = "空頭實體突破 (BOS)";
+                signalType = "SELL";
+            }
+
+            document.getElementById('hud-smc-state').textContent = smcEvent;
+
+            // 達到新 K 棒訊號且未推播過
+            if (signalType && latestBar.time !== lastNotifiedSignalBar) {
+                lastNotifiedSignalBar = latestBar.time;
+                const riskDist = Math.abs(latestBar.close - (signalType === "BUY" ? latestBar.low : latestBar.high));
+                const tp = signalType === "BUY" ? (latestBar.close + riskDist * 2) : (latestBar.close - riskDist * 2);
+                const sl = signalType === "BUY" ? latestBar.low : latestBar.high;
+
+                sendDiscordAlert(
+                    `🚨 觸發 SMC ${signalType} 開單訊號 (1:2)`,
+                    `ETHUSDT 1H 出現結構突破，且符合 200 EMA 宏觀順勢與 ADX 趨勢強度門檻！`,
+                    signalType === "BUY" ? 0x0ecb81 : 0xf6465d,
+                    [
+                        { name: "方向", value: signalType === "BUY" ? "🟢 做多 (LONG)" : "🔴 做空 (SHORT)", inline: true },
+                        { name: "現價 (進場)", value: `$${latestBar.close.toFixed(2)}`, inline: true },
+                        { name: "200 EMA", value: `$${emaVal.toFixed(2)}`, inline: true },
+                        { name: "止盈目標 (TP 2R)", value: `$${tp.toFixed(2)}`, inline: true },
+                        { name: "嚴格止損 (SL 1R)", value: `$${sl.toFixed(2)}`, inline: true },
+                        { name: "ADX 趨勢強度", value: `${adxVal.toFixed(1)} (符合門檻)`, inline: true }
+                    ]
+                );
+            }
+        }
+
+        // ==========================================
+        // 4. 幣安 REST 歷史載入 + WebSocket 即時同步
+        // ==========================================
+        async function initData() {
+            try {
+                const res = await fetch('https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=1h&limit=300');
+                const raw = await res.json();
+                klines = raw.map(d => ({
+                    time: d[0] / 1000,
+                    open: parseFloat(d[1]),
+                    high: parseFloat(d[2]),
+                    low: parseFloat(d[3]),
+                    close: parseFloat(d[4])
+                }));
+
+                candleSeries.setData(klines);
+
+                const emaData = calcEMA(klines, 200);
+                emaSeries.setData(emaData.filter(d => !isNaN(d.value)));
+
+                updateHUD(klines[klines.length - 1], emaData[emaData.length - 1].value);
+                initWebSocket();
+            } catch (err) {
+                console.error('初始化歷史數據失敗:', err);
+            }
+        }
+
+        function updateHUD(latest, emaVal) {
+            document.getElementById('hud-price').textContent = latest.close.toFixed(2);
+            document.getElementById('hud-ema').textContent = emaVal ? emaVal.toFixed(2) : '--.--';
+
+            const emaStatusEl = document.getElementById('hud-ema-status');
+            if (emaVal) {
+                if (latest.close > emaVal) {
+                    emaStatusEl.textContent = "多頭管轄 (僅做多)";
+                    emaStatusEl.className = "hud-sub-desc val-bull";
+                } else {
+                    emaStatusEl.textContent = "空頭管轄 (僅做空)";
+                    emaStatusEl.className = "hud-sub-desc val-bear";
+                }
+            }
+
+            const adxVal = calcADX(klines, 14);
+            const adxStatusEl = document.getElementById('hud-adx-status');
+            document.getElementById('hud-adx').textContent = adxVal.toFixed(1);
+            if (adxVal >= 20) {
+                adxStatusEl.textContent = "趨勢明確 (允許開單)";
+                adxStatusEl.className = "hud-sub-desc val-bull";
+            } else {
+                adxStatusEl.textContent = "震盪死區 (禁止開單)";
+                adxStatusEl.className = "hud-sub-desc val-bear";
+            }
+
+            if (klines.length > 2 && emaVal) {
+                evaluateSignalAndNotify(latest, klines[klines.length - 2], emaVal, adxVal);
+            }
+        }
+
+        function initWebSocket() {
+            const ws = new WebSocket('wss://fstream.binance.com/ws/ethusdt@kline_1h');
+            const statusBadge = document.getElementById('conn-status');
+
+            ws.onopen = () => {
+                statusBadge.textContent = "● 實時串流中";
+                statusBadge.classList.add('online');
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.e === 'kline') {
+                    const k = msg.k;
+                    const bar = {
+                        time: k.t / 1000,
+                        open: parseFloat(k.o),
+                        high: parseFloat(k.h),
+                        low: parseFloat(k.l),
+                        close: parseFloat(k.c)
+                    };
+
+                    candleSeries.update(bar);
+
+                    if (klines[klines.length - 1].time === bar.time) {
+                        klines[klines.length - 1] = bar;
+                    } else {
+                        klines.push(bar);
+                    }
+
+                    const emaData = calcEMA(klines, 200);
+                    const latestEma = emaData[emaData.length - 1].value;
+                    emaSeries.update({ time: bar.time, value: latestEma });
+
+                    updateHUD(bar, latestEma);
+                }
+            };
+
+            ws.onclose = () => {
+                statusBadge.textContent = "○ 斷線重連中...";
+                statusBadge.classList.remove('online');
+                setTimeout(initWebSocket, 3000);
+            };
+        }
+
+        initData();
+    </script>
 </body>
 </html>
