@@ -29,7 +29,6 @@
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
     
-    /* 幣種大按鈕切換組 */
     .coin-switcher {
       display: flex;
       background: #090c12;
@@ -331,7 +330,6 @@
 <body onclick="initAudio()">
   <header>
     <div class="header-left">
-      <!-- ★ 幣種一鍵切換列 (ETH / BTC / SOL) -->
       <div class="coin-switcher">
         <button class="coin-btn active" data-coin="ETHUSDT" onclick="changeSymbol('ETHUSDT')">ETH</button>
         <button class="coin-btn" data-coin="BTCUSDT" onclick="changeSymbol('BTCUSDT')">BTC</button>
@@ -407,6 +405,10 @@
           <span id="cur-vol" class="metric-val">--</span>
         </div>
         <div class="metric-row">
+          <span>更新模式:</span>
+          <span class="metric-val" style="color:#38bdf8;">固定每 1 分鐘更新</span>
+        </div>
+        <div class="metric-row">
           <span>訊號開關狀態:</span>
           <span id="cur-switch-status" class="metric-val" style="color:#60a5fa;">多[開] / 空[開]</span>
         </div>
@@ -458,7 +460,7 @@
           <button class="btn-audio-sub" onclick="document.getElementById('sell-audio-input').click()">📁 導入空單音檔</button>
         </div>
 
-        <button class="btn-audio-sub" style="width: 100%; margin-top: 6px;" onclick="resetCustomAudios()">🔄 重置為預設音效</button>
+        <button class="btn-audio-sub" style="width: 100%; margin-top: 8px;" onclick="resetCustomAudios()">🔄 重置為預設音效</button>
       </div>
 
       <div class="card">
@@ -514,7 +516,7 @@
       updateCoinUI();
       isInitialBoot = true;
       clearMeasurement();
-      stopConnection();
+      stopTimer();
       fetchHistoricalData();
     }
 
@@ -1038,7 +1040,6 @@
     let rawCandles = [];
     let notifiedSignals = new Set();
     let isInitialBoot = true;
-    let analysisTimer = null;
 
     function renderSignalToLog(type, price, sl, timestampSec) {
       document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
@@ -1057,14 +1058,6 @@
         logList.innerHTML = '';
       }
       logList.insertBefore(div, logList.firstChild);
-    }
-
-    function scheduleAnalysis() {
-      if (analysisTimer) return;
-      analysisTimer = setTimeout(() => {
-        analysisTimer = null;
-        runAnalysisAndRender();
-      }, 200);
     }
 
     function runAnalysisAndRender() {
@@ -1211,33 +1204,50 @@
 
       document.getElementById('cur-tf-label').innerText = `${tf.toUpperCase()} 週期`;
 
-      stopConnection();
+      stopTimer();
       fetchHistoricalData();
     }
 
-    let activeWs = null;
-    let fallbackPollTimer = null;
-    let lastWsMessageTime = 0;
+    // ========== 固定 1 分鐘定時更新模組 ==========
+    let updateTimer = null;
+    let countdownTimer = null;
+    let countdownSeconds = 60;
 
-    function stopConnection() {
-      if (activeWs) {
-        activeWs.onopen = null;
-        activeWs.onmessage = null;
-        activeWs.onerror = null;
-        activeWs.onclose = null;
-        activeWs.close();
-        activeWs = null;
+    function stopTimer() {
+      if (updateTimer) {
+        clearInterval(updateTimer);
+        updateTimer = null;
       }
-      if (fallbackPollTimer) {
-        clearInterval(fallbackPollTimer);
-        fallbackPollTimer = null;
+      if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
       }
+    }
+
+    function startOneMinuteSchedule() {
+      stopTimer();
+      countdownSeconds = 60;
+
+      countdownTimer = setInterval(() => {
+        countdownSeconds--;
+        if (countdownSeconds <= 0) countdownSeconds = 60;
+        const statusEl = document.getElementById('conn-status');
+        if (statusEl) {
+          statusEl.innerText = `定時更新 (下次: ${countdownSeconds}s)`;
+          statusEl.className = 'status-badge status-connected';
+        }
+      }, 1000);
+
+      // 每 60,000 毫秒（1分鐘）觸發一次更新
+      updateTimer = setInterval(() => {
+        fetchLatestCandle();
+      }, 60000);
     }
 
     async function fetchHistoricalData() {
       const statusEl = document.getElementById('conn-status');
       const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
-      statusEl.innerText = `讀取 ${coinName} ${currentInterval}...`;
+      statusEl.innerText = `載入 ${coinName} ${currentInterval}...`;
       statusEl.className = 'status-badge status-connecting';
 
       const endpoints = [
@@ -1271,6 +1281,11 @@
           }));
           volumeSeries.setData(volumeData);
 
+          const last = rawCandles[rawCandles.length - 1];
+          const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
+          document.getElementById('cur-price').innerText = last.close.toFixed(decimals) + ' U';
+          document.getElementById('cur-vol').innerText = last.volume >= 1000 ? (last.volume / 1000).toFixed(2) + 'k' : last.volume.toFixed(1);
+
           chart.timeScale().fitContent();
           runAnalysisAndRender();
           resizeMeasureCanvas();
@@ -1282,125 +1297,55 @@
       }
 
       if (success) {
-        statusEl.innerText = `即時連線 (${coinName} ${currentInterval})`;
-        statusEl.className = 'status-badge status-connected';
-        initRealtimeFeed();
+        startOneMinuteSchedule();
       } else {
         statusEl.innerText = '連線失敗';
         statusEl.className = 'status-badge status-error';
       }
     }
 
-    function handleRealtimeCandle(candle) {
-      if (!rawCandles || rawCandles.length === 0) return;
-
-      const last = rawCandles[rawCandles.length - 1];
-      if (candle.time < last.time) return;
-
+    // 1分鐘定時獲取最新一筆 K 線並更新
+    async function fetchLatestCandle() {
       try {
-        candleSeries.update(candle);
-        volumeSeries.update({
-          time: candle.time,
-          value: candle.volume,
-          color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
-        });
-      } catch (err) {
-        console.warn("圖表更新容錯:", err);
-      }
+        const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=2`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const latest = data[data.length - 1];
+          const candle = {
+            time: Math.floor(latest[0] / 1000),
+            open: parseFloat(latest[1]),
+            high: parseFloat(latest[2]),
+            low: parseFloat(latest[3]),
+            close: parseFloat(latest[4]),
+            volume: parseFloat(latest[5])
+          };
 
-      const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
-      document.getElementById('cur-price').innerText = candle.close.toFixed(decimals) + ' U';
-      document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
+          const last = rawCandles[rawCandles.length - 1];
+          if (candle.time < last.time) return;
 
-      if (last.time === candle.time) {
-        rawCandles[rawCandles.length - 1] = candle;
-      } else {
-        rawCandles.push(candle);
-      }
+          candleSeries.update(candle);
+          volumeSeries.update({
+            time: candle.time,
+            value: candle.volume,
+            color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
+          });
 
-      scheduleAnalysis();
-    }
+          const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
+          document.getElementById('cur-price').innerText = candle.close.toFixed(decimals) + ' U';
+          document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
 
-    function initRealtimeFeed() {
-      stopConnection();
+          if (last.time === candle.time) {
+            rawCandles[rawCandles.length - 1] = candle;
+          } else {
+            rawCandles.push(candle);
+          }
 
-      const lowerSymbol = currentSymbol.toLowerCase();
-      const candidateWsUrls = [
-        `wss://fstream.binance.com/ws/${lowerSymbol}@kline_${currentInterval}`,
-        `wss://stream.binance.com:9443/ws/${lowerSymbol}@kline_${currentInterval}`,
-        `wss://stream.binance.com:443/ws/${lowerSymbol}@kline_${currentInterval}`
-      ];
-
-      let candidateIdx = 0;
-      let isWsAlive = false;
-
-      function connectWs() {
-        const targetUrl = candidateWsUrls[candidateIdx];
-        activeWs = new WebSocket(targetUrl);
-        const statusEl = document.getElementById('conn-status');
-        const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
-
-        activeWs.onopen = () => {
-          isWsAlive = true;
-          lastWsMessageTime = Date.now();
-          statusEl.innerText = `即時連線 (${coinName} ${currentInterval})`;
-          statusEl.className = 'status-badge status-connected';
-        };
-
-        activeWs.onmessage = (event) => {
-          lastWsMessageTime = Date.now();
-          try {
-            const msg = JSON.parse(event.data);
-            if (!msg || !msg.k) return;
-            const k = msg.k;
-            const candle = {
-              time: Math.floor(k.t / 1000),
-              open: parseFloat(k.o),
-              high: parseFloat(k.h),
-              low: parseFloat(k.l),
-              close: parseFloat(k.c),
-              volume: parseFloat(k.v)
-            };
-            handleRealtimeCandle(candle);
-          } catch (e) {}
-        };
-
-        activeWs.onerror = () => {
-          isWsAlive = false;
-        };
-
-        activeWs.onclose = () => {
-          isWsAlive = false;
-          candidateIdx = (candidateIdx + 1) % candidateWsUrls.length;
-          setTimeout(connectWs, 2500);
-        };
-      }
-
-      connectWs();
-
-      fallbackPollTimer = setInterval(async () => {
-        if (Date.now() - lastWsMessageTime > 3500) {
-          try {
-            const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=2`);
-            if (!res.ok) return;
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-              const latest = data[data.length - 1];
-              const candle = {
-                time: Math.floor(latest[0] / 1000),
-                open: parseFloat(latest[1]),
-                high: parseFloat(latest[2]),
-                low: parseFloat(latest[3]),
-                close: parseFloat(latest[4]),
-                volume: parseFloat(latest[5])
-              };
-              handleRealtimeCandle(candle);
-              document.getElementById('conn-status').innerText = `輪詢更新中 (${COIN_NAMES[currentSymbol] || currentSymbol})`;
-              document.getElementById('conn-status').className = 'status-badge status-connected';
-            }
-          } catch (e) {}
+          runAnalysisAndRender();
         }
-      }, 1000);
+      } catch (err) {
+        console.warn("1分鐘定時更新失敗:", err);
+      }
     }
 
     fetchHistoricalData();
