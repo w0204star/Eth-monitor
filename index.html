@@ -36,7 +36,7 @@
     .status-connecting { color: #ffab00; background: rgba(255, 171, 0, 0.1); border-color: #ffab00; }
     .status-error { color: #ff5252; background: rgba(255, 82, 82, 0.1); border-color: #ff5252; }
     
-    .header-right { display: flex; align-items: center; gap: 10px; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
     .webhook-group {
       display: flex;
       align-items: center;
@@ -51,7 +51,7 @@
       border: none;
       color: #fff;
       font-size: 0.75rem;
-      width: 140px;
+      width: 130px;
       outline: none;
     }
     .btn-dc {
@@ -76,6 +76,28 @@
       font-weight: 600;
     }
 
+    /* 多空開關按鈕群組 */
+    .switch-group {
+      display: flex;
+      background: #0d1017;
+      border-radius: 6px;
+      border: 1px solid #282f42;
+      overflow: hidden;
+    }
+    .btn-toggle-signal {
+      background: transparent;
+      border: none;
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-toggle-long.active { background: rgba(38, 166, 154, 0.25); color: #26a69a; border-right: 1px solid #282f42; }
+    .btn-toggle-long.inactive { background: transparent; color: #555c6d; border-right: 1px solid #282f42; text-decoration: line-through; }
+    .btn-toggle-short.active { background: rgba(239, 83, 80, 0.25); color: #ef5350; }
+    .btn-toggle-short.inactive { background: transparent; color: #555c6d; text-decoration: line-through; }
+
     .timeframe-group {
       display: flex;
       background: #0d1017;
@@ -88,7 +110,7 @@
       background: transparent;
       border: none;
       color: #8b949e;
-      padding: 6px 12px;
+      padding: 6px 11px;
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
@@ -101,7 +123,7 @@
       border: none;
       border-left: 1px solid #282f42;
       color: #8b949e;
-      padding: 6px 10px;
+      padding: 6px 8px;
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
@@ -114,7 +136,7 @@
       background: #232733;
       border: 1px solid #3b4254;
       color: white;
-      padding: 6px 12px;
+      padding: 6px 11px;
       font-size: 0.8rem;
       border-radius: 6px;
       cursor: pointer;
@@ -252,6 +274,12 @@
     </div>
     
     <div class="header-right">
+      <!-- 多空獨立開關控制群 -->
+      <div class="switch-group">
+        <button id="btn-toggle-long" class="btn-toggle-signal btn-toggle-long active" onclick="toggleSignal('LONG')">做多: 開</button>
+        <button id="btn-toggle-short" class="btn-toggle-signal btn-toggle-short active" onclick="toggleSignal('SHORT')">做空: 開</button>
+      </div>
+
       <div class="webhook-group">
         <span style="font-size: 0.75rem;">🤖 DC:</span>
         <input type="password" id="dc-webhook-url" class="webhook-input" placeholder="貼上 Webhook 網址" />
@@ -305,6 +333,10 @@
         <div class="metric-row">
           <span>當前成交量:</span>
           <span id="cur-vol" class="metric-val">--</span>
+        </div>
+        <div class="metric-row">
+          <span>訊號開關狀態:</span>
+          <span id="cur-switch-status" class="metric-val" style="color:#60a5fa;">多[開] / 空[開]</span>
         </div>
         <div class="metric-row">
           <span>EMA (9 / 21):</span>
@@ -386,6 +418,41 @@
   </main>
 
   <script>
+    // ========== 0. 多空訊號開關控制 (支援本地保存) ==========
+    let enableLongSignal = localStorage.getItem('eth_enable_long') !== 'false';
+    let enableShortSignal = localStorage.getItem('eth_enable_short') !== 'false';
+
+    function updateSignalSwitchUI() {
+      const btnLong = document.getElementById('btn-toggle-long');
+      const btnShort = document.getElementById('btn-toggle-short');
+      const statusText = document.getElementById('cur-switch-status');
+
+      if (btnLong) {
+        btnLong.innerText = enableLongSignal ? "做多: 開" : "做多: 關";
+        btnLong.className = "btn-toggle-signal btn-toggle-long " + (enableLongSignal ? "active" : "inactive");
+      }
+      if (btnShort) {
+        btnShort.innerText = enableShortSignal ? "做空: 開" : "做空: 關";
+        btnShort.className = "btn-toggle-signal btn-toggle-short " + (enableShortSignal ? "active" : "inactive");
+      }
+      if (statusText) {
+        statusText.innerText = `多[${enableLongSignal ? '開' : '關'}] / 空[${enableShortSignal ? '開' : '關'}]`;
+        statusText.style.color = (enableLongSignal && enableShortSignal) ? '#60a5fa' : enableLongSignal ? '#26a69a' : enableShortSignal ? '#ef5350' : '#888';
+      }
+    }
+
+    function toggleSignal(direction) {
+      if (direction === 'LONG') {
+        enableLongSignal = !enableLongSignal;
+        localStorage.setItem('eth_enable_long', enableLongSignal);
+      } else if (direction === 'SHORT') {
+        enableShortSignal = !enableShortSignal;
+        localStorage.setItem('eth_enable_short', enableShortSignal);
+      }
+      updateSignalSwitchUI();
+      runAnalysisAndRender();
+    }
+
     // ========== GMT+8 時間輔助函數 ==========
     function formatGMT8Time(timestampSec) {
       const date = new Date(timestampSec * 1000);
@@ -477,6 +544,7 @@
       slider.value = Math.round(alertVolume * 100);
       document.getElementById('volume-val').innerText = slider.value + '%';
       updateAudioStatusText();
+      updateSignalSwitchUI();
     });
 
     function initAudio() {
@@ -636,29 +704,25 @@
       }
     });
 
-    // 主圖 K 線系列
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#26a69a', downColor: '#ef5350',
       borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
     });
 
-    // 均線系列
     const fastEmaLine = chart.addLineSeries({ color: '#00e5ff', lineWidth: 2, title: 'EMA 9' });
     const slowEmaLine = chart.addLineSeries({ color: '#ff9100', lineWidth: 2, title: 'EMA 21' });
     const macroEmaLine = chart.addLineSeries({ color: '#787b86', lineWidth: 2, lineStyle: 2, title: 'EMA 200' });
 
-    // 底部成交量柱狀圖系列 (放置於主圖下方獨立 Scale)
     const volumeSeries = chart.addHistogramSeries({
       color: '#26a69a',
       priceFormat: { type: 'volume' },
-      priceScaleId: '', // 空字串表示疊加在主圖區域底端
+      priceScaleId: '',
     });
 
-    // 配置成交量副圖高度比例 (佔下方 20% 高度)
     volumeSeries.priceScale().applyOptions({
       scaleMargins: {
-        top: 0.8,    // 上方 80% 留給 K 棒與均線
-        bottom: 0,   // 底端緊貼圖表邊緣
+        top: 0.8,
+        bottom: 0,
       },
     });
 
@@ -727,7 +791,7 @@
       return rsiArr;
     }
 
-    // ========== 5. 訊號與即時推播判定 ==========
+    // ========== 5. 訊號與即時推播判定 (加入多空開關過濾) ==========
     let rawCandles = [];
     let notifiedSignals = new Set();
     let isInitialBoot = true;
@@ -763,7 +827,6 @@
       slowEmaLine.setData(slowEma);
       macroEmaLine.setData(macroEma);
 
-      // 同步渲染成交量副圖資料
       const volumeData = rawCandles.map(d => ({
         time: d.time,
         value: d.volume || 0,
@@ -788,9 +851,11 @@
         const prevRsi = rsi[i - 1];
         const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
 
+        // 多單邏輯
         const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
         const canLong = (i - lastLongIdx >= cooldown);
 
+        // 空單邏輯
         const deathCross = prevFast >= prevSlow && curFast < curSlow;
         const wasOverbought = prevRsi >= 65;
         const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
@@ -798,7 +863,8 @@
 
         let signalType = null;
 
-        if (goldCross && canLong) {
+        // ★ 依據開關過濾
+        if (enableLongSignal && goldCross && canLong) {
           lastLongIdx = i;
           signalType = "BUY";
           markers.push({
@@ -808,7 +874,7 @@
             shape: 'arrowUp',
             text: '做多'
           });
-        } else if (((wasOverbought && rsiCrossDown) || deathCross) && canShort) {
+        } else if (enableShortSignal && ((wasOverbought && rsiCrossDown) || deathCross) && canShort) {
           lastShortIdx = i;
           signalType = "SELL";
           markers.push({
