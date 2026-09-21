@@ -82,6 +82,7 @@
       border-radius: 6px;
       border: 1px solid #282f42;
       overflow: hidden;
+      align-items: center;
     }
     .tf-btn {
       background: transparent;
@@ -94,6 +95,20 @@
     }
     .tf-btn:hover { color: #fff; background: #1a1e2b; }
     .tf-btn.active { background: #2962ff; color: #ffffff; }
+
+    .tf-select {
+      background: #151924;
+      border: none;
+      border-left: 1px solid #282f42;
+      color: #8b949e;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+    .tf-select:hover { color: #fff; }
+    .tf-select.active { background: #2962ff; color: #ffffff; }
 
     .btn-audio {
       background: #232733;
@@ -251,6 +266,24 @@
         <button class="tf-btn" onclick="changeTimeframe('1h')">1h</button>
         <button class="tf-btn" onclick="changeTimeframe('4h')">4h</button>
         <button class="tf-btn" onclick="changeTimeframe('1d')">1d</button>
+        <!-- 自訂時間週期下拉選單 -->
+        <select id="custom-tf-select" class="tf-select" onchange="changeTimeframe(this.value)">
+          <option value="" disabled selected>自訂週期</option>
+          <option value="1m">1m</option>
+          <option value="3m">3m</option>
+          <option value="5m">5m</option>
+          <option value="15m">15m</option>
+          <option value="30m">30m</option>
+          <option value="1h">1h</option>
+          <option value="2h">2h</option>
+          <option value="4h">4h</option>
+          <option value="6h">6h</option>
+          <option value="8h">8h</option>
+          <option value="12h">12h</option>
+          <option value="1d">1d</option>
+          <option value="3d">3d</option>
+          <option value="1w">1w</option>
+        </select>
       </div>
       <button id="btn-audio" class="btn-audio" onclick="toggleAudio()">🔊 聲音提醒</button>
     </div>
@@ -436,7 +469,6 @@
     let customSellAudioBase64 = localStorage.getItem('eth_custom_sell_audio') || null;
     let currentInterval = '15m';
 
-    // 排他性控制變數：確保同一時間只會有一個聲音
     let currentPlayingAudio = null;
     let currentOscillator = null;
 
@@ -453,7 +485,6 @@
     }
 
     function stopCurrentPlayingSound() {
-      // 1. 若有正在播放的自訂音訊，立即暫停並歸零
       if (currentPlayingAudio) {
         try {
           currentPlayingAudio.pause();
@@ -461,7 +492,6 @@
         } catch (e) {}
         currentPlayingAudio = null;
       }
-      // 2. 若有正在發聲的 Web Audio 振盪器，立即中斷
       if (currentOscillator) {
         try {
           currentOscillator.stop();
@@ -537,10 +567,8 @@
       if (!audioEnabled && !isTest) return;
       initAudio();
 
-      // ★ 核心優化：發聲前立即終止上一段聲音，保證排他性單一播放
       stopCurrentPlayingSound();
 
-      // 1. 若有自訂上傳音檔，播放自訂音訊
       const customAudioData = (type === "BUY") ? customBuyAudioBase64 : customSellAudioBase64;
       if (customAudioData) {
         const audio = new Audio(customAudioData);
@@ -551,7 +579,6 @@
         };
         audio.play().catch(e => console.warn('自訂音訊播放受阻:', e));
       } else {
-        // 2. 播放清脆的電子通知音
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -561,16 +588,16 @@
 
         if (type === "BUY") {
           osc.type = "sine";
-          osc.frequency.setValueAtTime(784, now); // G5
-          osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.12); // C6
+          osc.frequency.setValueAtTime(784, now);
+          osc.frequency.exponentialRampToValueAtTime(1046.5, now + 0.12);
           gain.gain.setValueAtTime(alertVolume * 0.45, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
           osc.start(now);
           osc.stop(now + 0.35);
         } else {
           osc.type = "triangle";
-          osc.frequency.setValueAtTime(523.25, now); // C5
-          osc.frequency.exponentialRampToValueAtTime(261.63, now + 0.22); // C4
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.exponentialRampToValueAtTime(261.63, now + 0.22);
           gain.gain.setValueAtTime(alertVolume * 0.5, now);
           gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
           osc.start(now);
@@ -826,17 +853,29 @@
       if (isInitialBoot) isInitialBoot = false;
     }
 
-    // ========== 6. 週期切換與行情載入 ==========
+    // ========== 6. 週期切換與行情載入 (含自訂週期支援) ==========
     let activeWs = null;
 
     function changeTimeframe(tf) {
-      if (currentInterval === tf) return;
+      if (!tf || currentInterval === tf) return;
       currentInterval = tf;
       isInitialBoot = true;
 
+      // 檢查是否為快捷按鈕之一
+      let isShortcut = false;
       document.querySelectorAll('.tf-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText.toLowerCase() === tf.toLowerCase());
+        const match = btn.innerText.toLowerCase() === tf.toLowerCase();
+        btn.classList.toggle('active', match);
+        if (match) isShortcut = true;
       });
+
+      // 同步自訂下拉選單狀態
+      const selectEl = document.getElementById('custom-tf-select');
+      if (selectEl) {
+        selectEl.value = tf;
+        selectEl.classList.toggle('active', !isShortcut);
+      }
+
       document.getElementById('cur-tf-label').innerText = `${tf.toUpperCase()} 週期`;
 
       if (activeWs) {
