@@ -76,6 +76,27 @@
       font-weight: 600;
     }
 
+    /* 測量工具按鈕 */
+    .btn-measure {
+      background: #232733;
+      border: 1px solid #3b4254;
+      color: #cbd5e1;
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .btn-measure:hover { background: #2f3647; color: #fff; }
+    .btn-measure.active {
+      background: #2962ff;
+      border-color: #2962ff;
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(41, 98, 255, 0.5);
+    }
+
     /* 多空開關按鈕群組 */
     .switch-group {
       display: flex;
@@ -149,11 +170,45 @@
       display: grid;
       grid-template-columns: 1fr 350px;
       height: calc(100vh - 52px);
+      position: relative;
+    }
+    #chart-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
     #chart-container {
       width: 100%;
       height: 100%;
       background: #0f121a;
+    }
+
+    /* 測量層 Canvas 與 Tooltip 資訊方塊 */
+    #measure-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #measure-tooltip {
+      position: absolute;
+      display: none;
+      background: rgba(19, 23, 34, 0.94);
+      border: 1px solid #2962ff;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #fff;
+      pointer-events: none;
+      z-index: 20;
+      white-space: nowrap;
+      font-family: monospace;
     }
 
     aside {
@@ -274,6 +329,9 @@
     </div>
     
     <div class="header-right">
+      <!-- 尺規測量按鈕 (支援快捷鍵 Shift+拖曳) -->
+      <button id="btn-measure-tool" class="btn-measure" onclick="toggleMeasureMode()" title="點擊切換測量工具，或直接在圖表按住 Shift 鍵拖曳">📏 測量</button>
+
       <!-- 多空獨立開關控制群 -->
       <div class="switch-group">
         <button id="btn-toggle-long" class="btn-toggle-signal btn-toggle-long active" onclick="toggleSignal('LONG')">做多: 開</button>
@@ -317,7 +375,11 @@
   </header>
 
   <main>
-    <div id="chart-container"></div>
+    <div id="chart-wrapper">
+      <div id="chart-container"></div>
+      <canvas id="measure-canvas"></canvas>
+      <div id="measure-tooltip"></div>
+    </div>
     
     <aside>
       <!-- 戰情儀表板 -->
@@ -726,11 +788,177 @@
       },
     });
 
-    window.addEventListener('resize', () => {
-      chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+    // ========== 4. 尺規測量工具 (Measure Tool) 核心邏輯 ==========
+    const measureCanvas = document.getElementById('measure-canvas');
+    const measureCtx = measureCanvas.getContext('2d');
+    const measureTooltip = document.getElementById('measure-tooltip');
+    const chartWrapper = document.getElementById('chart-wrapper');
+
+    let isMeasureActive = false;
+    let isMeasuring = false;
+    let measureStart = null; // { x, y, price, time }
+    let measureCurrent = null; // { x, y, price, time }
+    let isShiftKeyDown = false;
+
+    function resizeMeasureCanvas() {
+      const rect = chartWrapper.getBoundingClientRect();
+      measureCanvas.width = rect.width;
+      measureCanvas.height = rect.height;
+      drawMeasurement();
+    }
+
+    function toggleMeasureMode() {
+      isMeasureActive = !isMeasureActive;
+      const btn = document.getElementById('btn-measure-tool');
+      if (btn) btn.classList.toggle('active', isMeasureActive);
+      if (!isMeasureActive) {
+        clearMeasurement();
+      }
+    }
+
+    function clearMeasurement() {
+      isMeasuring = false;
+      measureStart = null;
+      measureCurrent = null;
+      measureCtx.clearRect(0, 0, measureCanvas.width, measureCanvas.height);
+      measureTooltip.style.display = 'none';
+      chart.applyOptions({ handleScroll: true, handleScale: true });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Shift') isShiftKeyDown = true;
+      if (e.key === 'Escape') {
+        clearMeasurement();
+        if (isMeasureActive) toggleMeasureMode();
+      }
     });
 
-    // ========== 4. 指標算法 ==========
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'Shift') isShiftKeyDown = false;
+    });
+
+    function getMouseLogicalPos(e) {
+      const rect = chartWrapper.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const time = chart.timeScale().coordinateToTime(x);
+      const price = candleSeries.coordinateToPrice(y);
+      return { x, y, time, price };
+    }
+
+    chartWrapper.addEventListener('mousedown', (e) => {
+      // 支援點選按鈕啟動，或直接按住鍵盤 Shift 鍵開始測量
+      if (isMeasureActive || isShiftKeyDown) {
+        e.preventDefault();
+        const pos = getMouseLogicalPos(e);
+        if (pos.price !== null) {
+          isMeasuring = true;
+          measureStart = pos;
+          measureCurrent = pos;
+          // 鎖定圖表平移縮放，防止拉測量時跑版
+          chart.applyOptions({ handleScroll: false, handleScale: false });
+        }
+      } else if (measureStart && !isMeasuring) {
+        // 點擊空白處清除之前的測量結果
+        clearMeasurement();
+      }
+    });
+
+    chartWrapper.addEventListener('mousemove', (e) => {
+      if (isMeasuring && measureStart) {
+        measureCurrent = getMouseLogicalPos(e);
+        drawMeasurement();
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (isMeasuring) {
+        isMeasuring = false;
+        chart.applyOptions({ handleScroll: true, handleScale: true });
+        if (isMeasureActive && !isShiftKeyDown) {
+          toggleMeasureMode(); // 測量完成一次後自動釋放按鈕
+        }
+      }
+    });
+
+    function drawMeasurement() {
+      measureCtx.clearRect(0, 0, measureCanvas.width, measureCanvas.height);
+      if (!measureStart || !measureCurrent) return;
+
+      const p1 = measureStart;
+      const p2 = measureCurrent;
+
+      const x1 = Math.min(p1.x, p2.x);
+      const y1 = Math.min(p1.y, p2.y);
+      const width = Math.abs(p2.x - p1.x);
+      const height = Math.abs(p2.y - p1.y);
+
+      const priceDiff = (p2.price !== null && p1.price !== null) ? (p2.price - p1.price) : 0;
+      const pctChange = (p1.price && p1.price > 0) ? ((priceDiff / p1.price) * 100) : 0;
+      const isPositive = priceDiff >= 0;
+
+      const fillColor = isPositive ? 'rgba(38, 166, 154, 0.18)' : 'rgba(239, 83, 80, 0.18)';
+      const strokeColor = isPositive ? '#26a69a' : '#ef5350';
+
+      // 繪製半透明測量矩形選區
+      measureCtx.fillStyle = fillColor;
+      measureCtx.fillRect(x1, y1, width, height);
+
+      // 繪製對角線與邊框
+      measureCtx.strokeStyle = strokeColor;
+      measureCtx.lineWidth = 1.5;
+      measureCtx.setLineDash([4, 4]);
+      measureCtx.strokeRect(x1, y1, width, height);
+
+      measureCtx.beginPath();
+      measureCtx.moveTo(p1.x, p1.y);
+      measureCtx.lineTo(p2.x, p2.y);
+      measureCtx.stroke();
+      measureCtx.setLineDash([]);
+
+      // 計算跨越的 K 棒數量 (Bars) 與時間
+      let barCount = 1;
+      let timeDiffStr = "--";
+      if (p1.time && p2.time && rawCandles.length > 0) {
+        const tMin = Math.min(p1.time, p2.time);
+        const tMax = Math.max(p1.time, p2.time);
+        barCount = rawCandles.filter(c => c.time >= tMin && c.time <= tMax).length || 1;
+        const totalSec = tMax - tMin;
+        const days = Math.floor(totalSec / 86400);
+        const hours = Math.floor((totalSec % 86400) / 3600);
+        const mins = Math.floor((totalSec % 3600) / 60);
+        timeDiffStr = days > 0 ? `${days}天 ${hours}小時` : hours > 0 ? `${hours}小時 ${mins}分` : `${mins}分鐘`;
+      }
+
+      // 更新並定位 Tooltip
+      const sign = isPositive ? '+' : '';
+      measureTooltip.innerHTML = `
+        <div style="font-size: 0.92rem; font-weight: 700; color: ${strokeColor}; margin-bottom: 2px;">
+          ${sign}${pctChange.toFixed(2)}% (${sign}${priceDiff.toFixed(2)} U)
+        </div>
+        <div style="color: #94a3b8; font-size: 0.76rem;">
+          範圍: ${barCount} 根 K 線 | 歷時: ${timeDiffStr}
+        </div>
+      `;
+      measureTooltip.style.borderColor = strokeColor;
+      measureTooltip.style.display = 'block';
+
+      // 智慧浮動位置：避免跑出圖表右側或底端
+      let tipX = p2.x + 12;
+      let tipY = p2.y - 45;
+      if (tipX + 180 > chartWrapper.clientWidth) tipX = p2.x - 190;
+      if (tipY < 10) tipY = p2.y + 15;
+      measureTooltip.style.left = `${tipX}px`;
+      measureTooltip.style.top = `${tipY}px`;
+    }
+
+    window.addEventListener('resize', () => {
+      chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
+      resizeMeasureCanvas();
+    });
+    setTimeout(resizeMeasureCanvas, 500);
+
+    // ========== 5. 指標算法 ==========
     function calcEMA(data, length) {
       const k = 2 / (length + 1);
       const ema = [];
@@ -791,7 +1019,7 @@
       return rsiArr;
     }
 
-    // ========== 5. 訊號與即時推播判定 (加入多空開關過濾) ==========
+    // ========== 6. 訊號與即時推播判定 (含多空開關) ==========
     let rawCandles = [];
     let notifiedSignals = new Set();
     let isInitialBoot = true;
@@ -851,11 +1079,9 @@
         const prevRsi = rsi[i - 1];
         const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
 
-        // 多單邏輯
         const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
         const canLong = (i - lastLongIdx >= cooldown);
 
-        // 空單邏輯
         const deathCross = prevFast >= prevSlow && curFast < curSlow;
         const wasOverbought = prevRsi >= 65;
         const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
@@ -863,7 +1089,6 @@
 
         let signalType = null;
 
-        // ★ 依據開關過濾
         if (enableLongSignal && goldCross && canLong) {
           lastLongIdx = i;
           signalType = "BUY";
@@ -945,13 +1170,14 @@
       if (isInitialBoot) isInitialBoot = false;
     }
 
-    // ========== 6. 週期切換與行情載入 ==========
+    // ========== 7. 週期切換與行情載入 ==========
     let activeWs = null;
 
     function changeTimeframe(tf) {
       if (!tf || currentInterval === tf) return;
       currentInterval = tf;
       isInitialBoot = true;
+      clearMeasurement();
 
       let isShortcut = false;
       document.querySelectorAll('.tf-btn').forEach(btn => {
@@ -1007,6 +1233,7 @@
           candleSeries.setData(rawCandles);
           chart.timeScale().fitContent();
           runAnalysisAndRender();
+          resizeMeasureCanvas();
           success = true;
           break;
         } catch (e) {
