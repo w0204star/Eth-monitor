@@ -1,0 +1,197 @@
+const WebSocket = require('ws');
+const axios = require('axios');
+
+// 從環境變數讀取 Discord Webhook（更安全）
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK || '';
+const INTERVAL = process.env.INTERVAL || '15m';
+
+let rawCandles = [];
+let lastAlertTimestamp = 0;
+
+// ========== 計算公式 ==========
+function calcEMA(data, length) {
+  const k = 2 / (length + 1);
+  const ema = [];
+  let prevEma = data[0].close;
+  for (let i = 0; i < data.length; i++) {
+    const val = i === 0 ? prevEma : data[i].close * k + prevEma * (1 - k);
+    ema.push({ time: data[i].time, value: val });
+    prevEma = val;
+  }
+  return ema;
+}
+
+function calcATR(data, length = 14) {
+  const tr = [];
+  for (let i = 0; i < data.length; i++) {
+    if (i === 0) {
+      tr.push(data[i].high - data[i].low);
+    } else {
+      const hl = data[i].high - data[i].low;
+      const hc = Math.abs(data[i].high - data[i - 1].close);
+      const lc = Math.abs(data[i].low - data[i - 1].close);
+      tr.push(Math.max(hl, hc, lc));
+    }
+  }
+  let atr = 0;
+  for (let i = 0; i < length; i++) atr += tr[i];
+  atr /= length;
+  const atrs = [atr];
+  for (let i = length; i < data.length; i++) {
+    atr = (atr * (length - 1) + tr[i]) / length;
+    atrs.push(atr);
+  }
+  return atrs;
+}
+
+function calcRSI(data, length = 14) {
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= length; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+  let avgGain = gains / length;
+  let avgLoss = losses / length;
+  const rsiArr = new Array(length).fill(50);
+  let rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  rsiArr.push(100 - (100 / (1 + rs)));
+
+  for (let i = length + 1; i < data.length; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (length - 1) + gain) / length;
+    avgLoss = (avgLoss * (length - 1) + loss) / length;
+    rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsiArr.push(100 - (100 / (1 + rs)));
+  }
+  return rsiArr;
+}
+
+// ========== Discord 發送 ==========
+async function sendDiscordAlert(type, price, sl) {
+  if (!DISCORD_WEBHOOK_URL) {
+    console.log(`[未設定 Webhook] 訊號觸發: ${type} @ ${price}`);
+    return;
+  }
+
+  const isBuy = type === "BUY";
+  const payload = {
+    username: "ETH 雲端哨兵 (24H)",
+    embeds: [{
+      title: isBuy ? "🚀 【做多訊號觸發】ETHUSDT" : "🩸 【做空訊號觸發】ETHUSDT",
+      color: isBuy ? 0x26a69a : 0xef5350,
+      fields: [
+        { name: "監控週期", value: INTERVAL, inline: true },
+        { name: "觸發價格", value: `$${price.toFixed(2)}`, inline: true },
+        { name: "建議防守 (SL)", value: `$${sl.toFixed(2)}`, inline: true }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: { text: "雲端背景掛機中 • 免開網頁" }
+    }]
+  };
+
+  try {
+    await axios.post(DISCORD_WEBHOOK_URL, payload);
+    console.log(`[成功推播] ${type} 訊號已送出至 Discord`);
+  } catch (err) {
+    console.error('Discord 發送錯誤:', err.message);
+  }
+}
+
+// ========== 訊號判定邏輯 ==========
+function evaluateSignals() {
+  if (rawCandles.length < 50) return;
+
+  const fastEma = calcEMA(rawCandles, 9);
+  const slowEma = calcEMA(rawCandles, 21);
+  const rsi = calcRSI(rawCandles, 14);
+  const atr = calcATR(rawCandles, 14);
+
+  const len = rawCandles.length;
+  const cur = rawCandles[len - 1];
+  const prev = rawCandles[len - 2];
+
+  const curFast = fastEma[len - 1].value;
+  const curSlow = slowEma[len - 1].value;
+  const prevFast = fastEma[len - 2].value;
+  const prevSlow = slowEma[len - 2].value;
+
+  const curRsi = rsi[len - 1];
+  const prevRsi = rsi[len - 2];
+  const curAtr = atr[atr.length - 1];
+
+  const trendUp = curFast > curSlow;
+  const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
+
+  const deathCross = prevFast >= prevSlow && curFast < curSlow;
+  const wasOverbought = prevRsi >= 65;
+  const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
+
+  if (trendUp && goldCross && cur.time !== lastAlertTimestamp) {
+    lastAlertTimestamp = cur.time;
+    sendDiscordAlert("BUY", cur.close, cur.close - curAtr * 1.5);
+  } else if (((wasOverbought && rsiCrossDown) || deathCross) && cur.time !== lastAlertTimestamp) {
+    lastAlertTimestamp = cur.time;
+    sendDiscordAlert("SELL", cur.close, cur.close + curAtr * 1.5);
+  }
+}
+
+// ========== 載入初始 K 線與建立 WebSocket ==========
+async function startBot() {
+  try {
+    console.log(`正在初始化 ETHUSDT (${INTERVAL}) 行情...`);
+    const res = await axios.get(`https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=${INTERVAL}&limit=300`);
+    rawCandles = res.data.map(d => ({
+      time: Math.floor(d[0] / 1000),
+      open: parseFloat(d[1]),
+      high: parseFloat(d[2]),
+      low: parseFloat(d[3]),
+      close: parseFloat(d[4])
+    }));
+    console.log('歷史行情載入完畢，啟動 WebSocket 實時監聽...');
+
+    const ws = new WebSocket(`wss://fstream.binance.com/ws/ethusdt@kline_${INTERVAL}`);
+
+    ws.on('open', () => console.log('✅ WebSocket 已成功連線至幣安伺服器'));
+
+    ws.on('message', (data) => {
+      const msg = JSON.parse(data);
+      if (msg.e === 'kline') {
+        const k = msg.k;
+        const candle = {
+          time: Math.floor(k.t / 1000),
+          open: parseFloat(k.o),
+          high: parseFloat(k.h),
+          low: parseFloat(k.l),
+          close: parseFloat(k.c)
+        };
+
+        const last = rawCandles[rawCandles.length - 1];
+        if (last && last.time === candle.time) {
+          rawCandles[rawCandles.length - 1] = candle;
+        } else {
+          rawCandles.push(candle);
+        }
+
+        evaluateSignals();
+      }
+    });
+
+    ws.on('close', () => {
+      console.log('WebSocket 斷線，5 秒後嘗試重連...');
+      setTimeout(startBot, 5000);
+    });
+
+    ws.on('error', (err) => {
+      console.error('WebSocket 錯誤:', err.message);
+    });
+
+  } catch (err) {
+    console.error('初始化失敗，5 秒後重試:', err.message);
+    setTimeout(startBot, 5000);
+  }
+}
+
+startBot();
