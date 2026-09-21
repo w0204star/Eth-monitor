@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ETH 專用即時 SMC & 多空信號監控儀表板</title>
+  <title>ETH/USDT 專業監控中心</title>
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -21,7 +21,6 @@
       justify-content: space-between;
       align-items: center;
       border-bottom: 1px solid #232733;
-      gap: 10px;
       height: 52px;
     }
     .header-left { display: flex; align-items: center; gap: 12px; }
@@ -32,8 +31,6 @@
     .status-error { color: #ff5252; background: rgba(255, 82, 82, 0.1); border-color: #ff5252; }
     
     .header-right { display: flex; align-items: center; gap: 10px; }
-    
-    /* Discord Webhook 控制列 */
     .webhook-group {
       display: flex;
       align-items: center;
@@ -60,7 +57,6 @@
       border-radius: 4px;
       cursor: pointer;
       font-weight: 600;
-      transition: 0.2s;
     }
     .btn-dc:hover { background: #4752c4; }
     .btn-dc-test {
@@ -73,7 +69,6 @@
       cursor: pointer;
       font-weight: 600;
     }
-    .btn-dc-test:hover { background: #374151; color: #fff; }
 
     .timeframe-group {
       display: flex;
@@ -90,7 +85,6 @@
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
     }
     .tf-btn:hover { color: #fff; background: #1a1e2b; }
     .tf-btn.active { background: #2962ff; color: #ffffff; }
@@ -112,76 +106,11 @@
       display: grid;
       grid-template-columns: 1fr 340px;
       height: calc(100vh - 52px);
-      position: relative;
-    }
-    #chart-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
     }
     #chart-container {
       width: 100%;
       height: 100%;
       background: #0f121a;
-    }
-
-    #badge-layer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      overflow: hidden;
-    }
-
-    .badge-callout-sell {
-      position: absolute;
-      transform: translate(-50%, -100%);
-      background: #dc3545;
-      color: #ffffff;
-      font-size: 0.85rem;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 5px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-      white-space: nowrap;
-      margin-top: -6px;
-    }
-    .badge-callout-sell::after {
-      content: "";
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 5px;
-      border-style: solid;
-      border-color: #dc3545 transparent transparent transparent;
-    }
-
-    .badge-callout-buy {
-      position: absolute;
-      transform: translate(-50%, 0%);
-      background: #2e7d32;
-      color: #ffffff;
-      font-size: 0.85rem;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 5px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-      white-space: nowrap;
-      margin-top: 6px;
-    }
-    .badge-callout-buy::after {
-      content: "";
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 5px;
-      border-style: solid;
-      border-color: transparent transparent #2e7d32 transparent;
     }
 
     aside {
@@ -263,10 +192,7 @@
   </header>
 
   <main>
-    <div id="chart-wrapper">
-      <div id="chart-container"></div>
-      <div id="badge-layer"></div>
-    </div>
+    <div id="chart-container"></div>
     
     <aside>
       <div class="card">
@@ -326,7 +252,7 @@
   </main>
 
   <script>
-    // ========== 1. Discord Webhook 模組 ==========
+    // ========== 1. Discord Webhook ==========
     let discordWebhookUrl = localStorage.getItem('eth_discord_webhook') || '';
     const dcInput = document.getElementById('dc-webhook-url');
     if (discordWebhookUrl) dcInput.value = discordWebhookUrl;
@@ -348,7 +274,6 @@
 
     async function sendDiscordNotification(type, price, sl, tf) {
       if (!discordWebhookUrl) return;
-
       const isBuy = type === "BUY";
       const payload = {
         username: "ETH 策略哨兵",
@@ -364,7 +289,6 @@
           footer: { text: "ETH 獨立戰情中心推播" }
         }]
       };
-
       try {
         await fetch(discordWebhookUrl, {
           method: 'POST',
@@ -391,12 +315,8 @@
     let currentInterval = '15m';
 
     function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
     function toggleAudio() {
@@ -410,7 +330,6 @@
     function playAlertSound(type) {
       if (!audioEnabled) return;
       initAudio();
-
       const now = audioCtx.currentTime;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -445,10 +364,8 @@
       }
     }
 
-    // ========== 3. 圖表初始化 ==========
+    // ========== 3. 圖表引擎 ==========
     const chartContainer = document.getElementById('chart-container');
-    const badgeLayer = document.getElementById('badge-layer');
-
     const chart = LightweightCharts.createChart(chartContainer, {
       layout: { background: { color: '#0f121a' }, textColor: '#8b949e' },
       grid: { vertLines: { color: '#1a1f2c' }, horzLines: { color: '#1a1f2c' } },
@@ -466,11 +383,9 @@
     const slowEmaLine = chart.addLineSeries({ color: '#ff9100', lineWidth: 2, title: 'EMA 21' });
     const macroEmaLine = chart.addLineSeries({ color: '#787b86', lineWidth: 2, lineStyle: 2, title: 'EMA 200' });
 
-    function resizeChart() {
+    window.addEventListener('resize', () => {
       chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
-      updateBadgePositions();
-    }
-    window.addEventListener('resize', resizeChart);
+    });
 
     // ========== 4. 指標算法 ==========
     function calcEMA(data, length) {
@@ -533,33 +448,7 @@
       return rsiArr;
     }
 
-    // ========== 5. 原版精確氣泡標籤管理 ==========
-    let activeBadges = [];
-
-    function updateBadgePositions() {
-      const timeScale = chart.timeScale();
-      badgeLayer.innerHTML = '';
-
-      activeBadges.forEach(b => {
-        const x = timeScale.timeToCoordinate(b.time);
-        const y = candleSeries.priceToCoordinate(b.price);
-
-        if (x !== null && y !== null && x >= -50 && x <= chartContainer.clientWidth + 50) {
-          const el = document.createElement('div');
-          el.className = b.type === 'BUY' ? 'badge-callout-buy' : 'badge-callout-sell';
-          el.innerText = b.text;
-          el.style.left = `${x}px`;
-          el.style.top = `${y}px`;
-          badgeLayer.appendChild(el);
-        }
-      });
-    }
-
-    // 監聽圖表平移、縮放事件即時重新定位氣泡
-    chart.timeScale().subscribeVisibleTimeRangeChange(updateBadgePositions);
-    chart.timeScale().subscribeVisibleLogicalRangeChange(updateBadgePositions);
-
-    // ========== 6. 原版多空運算邏輯 ==========
+    // ========== 5. 原生標記與多空訊號計算 ==========
     let rawCandles = [];
     let lastAlertTimestamp = 0;
 
@@ -576,43 +465,39 @@
       slowEmaLine.setData(slowEma);
       macroEmaLine.setData(macroEma);
 
-      activeBadges = [];
+      const markers = [];
       const len = rawCandles.length;
       let lastLongIdx = -999;
       let lastShortIdx = -999;
       const cooldown = 4;
 
-      const startIdx = Math.max(25, 1);
-      for (let i = startIdx; i < len; i++) {
+      for (let i = 25; i < len; i++) {
         const cur = rawCandles[i];
-        const prev = rawCandles[i - 1];
-
         const curFast = fastEma[i].value;
         const curSlow = slowEma[i].value;
         const prevFast = fastEma[i - 1].value;
         const prevSlow = slowEma[i - 1].value;
-
         const curRsi = rsi[i];
         const prevRsi = rsi[i - 1];
         const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
 
-        // 原版做多判斷：快線金叉慢線且價格在慢線上方
-        const trendUp = curFast > curSlow;
+        // 做多：黃藍金叉突破
         const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
         const canLong = (i - lastLongIdx >= cooldown);
 
-        // 原版做空判斷：超買後回落或死叉
+        // 做空：死叉或超買回落
         const deathCross = prevFast >= prevSlow && curFast < curSlow;
         const wasOverbought = prevRsi >= 65;
         const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
         const canShort = (i - lastShortIdx >= cooldown);
 
-        if (trendUp && goldCross && canLong) {
+        if (goldCross && canLong) {
           lastLongIdx = i;
-          activeBadges.push({
+          markers.push({
             time: cur.time,
-            price: cur.low,
-            type: 'BUY',
+            position: 'belowBar',
+            color: '#00e676',
+            shape: 'arrowUp',
             text: '做多'
           });
 
@@ -622,10 +507,11 @@
           }
         } else if (((wasOverbought && rsiCrossDown) || deathCross) && canShort) {
           lastShortIdx = i;
-          activeBadges.push({
+          markers.push({
             time: cur.time,
-            price: cur.high,
-            type: 'SELL',
+            position: 'aboveBar',
+            color: '#ef5350',
+            shape: 'arrowDown',
             text: '做空'
           });
 
@@ -636,8 +522,10 @@
         }
       }
 
-      updateBadgePositions();
+      // 將標記綁定進圖表
+      candleSeries.setMarkers(markers);
 
+      // 更新儀表板
       const last = rawCandles[len - 1];
       const curFast = fastEma[len - 1].value;
       const curSlow = slowEma[len - 1].value;
@@ -683,7 +571,7 @@
       logList.insertBefore(div, logList.firstChild);
     }
 
-    // ========== 7. 週期切換與行情連接 ==========
+    // ========== 6. 週期切換與行情載入 ==========
     let activeWs = null;
 
     function changeTimeframe(tf) {
@@ -733,7 +621,6 @@
           candleSeries.setData(rawCandles);
           chart.timeScale().fitContent();
           runAnalysisAndRender();
-          setTimeout(updateBadgePositions, 200);
           success = true;
           break;
         } catch (e) {
@@ -789,9 +676,7 @@
       };
 
       activeWs.onclose = () => {
-        if (activeWs) {
-          setTimeout(initWebSocket, 4000);
-        }
+        if (activeWs) setTimeout(initWebSocket, 4000);
       };
     }
 
