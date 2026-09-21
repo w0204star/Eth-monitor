@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ETH/USDT 獨立監控中心</title>
+  <title>ETH/USDT 專業監控中心 (GMT+8)</title>
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -168,7 +168,7 @@
 <body>
   <header>
     <div class="header-left">
-      <span class="header-title">⚡ ETH/USDT 獨立監控中心</span>
+      <span class="header-title">⚡ ETH/USDT 獨立監控中心 (GMT+8)</span>
       <span id="conn-status" class="status-badge status-connecting">連線中...</span>
     </div>
     
@@ -244,7 +244,7 @@
       </div>
 
       <div class="card" style="flex: 1; display: flex; flex-direction: column;">
-        <div class="card-title">訊號推播紀錄</div>
+        <div class="card-title">訊號推播紀錄 (GMT+8)</div>
         <div id="log-list" class="log-box" style="flex:1;">
           <div style="color: #666; text-align: center; padding: 10px;">尚未偵測到即時信號</div>
         </div>
@@ -253,6 +253,21 @@
   </main>
 
   <script>
+    // ========== GMT+8 時間輔助函數 ==========
+    function formatGMT8Time(timestampSec) {
+      const date = new Date(timestampSec * 1000);
+      return date.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function formatGMT8Full(timestampSec) {
+      const date = new Date(timestampSec * 1000);
+      const y = date.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric' });
+      const m = date.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit' });
+      const d = date.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', day: '2-digit' });
+      const time = date.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false, hour: '2-digit', minute: '2-digit' });
+      return `${y}-${m}-${d} ${time}`;
+    }
+
     // ========== 1. Discord Webhook 模組 ==========
     let discordWebhookUrl = localStorage.getItem('eth_discord_webhook') || '';
     const dcInput = document.getElementById('dc-webhook-url');
@@ -276,15 +291,17 @@
     async function sendDiscordNotification(type, price, sl, tf) {
       if (!discordWebhookUrl) return;
       const isBuy = type === "BUY";
+      const gmt8Time = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       const payload = {
-        username: "ETH 策略哨兵",
+        username: "ETH 策略哨兵 (GMT+8)",
         embeds: [{
           title: isBuy ? "🚀 【做多信號觸發】ETHUSDT" : "🩸 【做空信號觸發】ETHUSDT",
           color: isBuy ? 0x26a69a : 0xef5350,
           fields: [
             { name: "監控週期", value: tf, inline: true },
             { name: "觸發現價", value: `$${price.toFixed(2)}`, inline: true },
-            { name: "建議防守止損", value: `$${sl.toFixed(2)}`, inline: true }
+            { name: "建議防守止損", value: `$${sl.toFixed(2)}`, inline: true },
+            { name: "觸發時間 (GMT+8)", value: gmt8Time, inline: false }
           ],
           timestamp: new Date().toISOString(),
           footer: { text: "ETH 獨立戰情中心推播" }
@@ -365,14 +382,32 @@
       }
     }
 
-    // ========== 3. 圖表初始化 ==========
+    // ========== 3. 圖表初始化 (全面鎖定 GMT+8) ==========
     const chartContainer = document.getElementById('chart-container');
     const chart = LightweightCharts.createChart(chartContainer, {
       layout: { background: { color: '#0f121a' }, textColor: '#8b949e' },
       grid: { vertLines: { color: '#1a1f2c' }, horzLines: { color: '#1a1f2c' } },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
       rightPriceScale: { borderColor: '#232733' },
-      timeScale: { borderColor: '#232733', timeVisible: true, secondsVisible: false }
+      timeScale: {
+        borderColor: '#232733',
+        timeVisible: true,
+        secondsVisible: false,
+        // 十字準心浮動框顯示 GMT+8
+        timeFormatter: (time) => formatGMT8Full(time),
+        // 底部座標軸刻度顯示 GMT+8
+        tickMarkFormatter: (time, tickMarkType, locale) => {
+          const date = new Date(time * 1000);
+          if (tickMarkType === 0) return date.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric' });
+          if (tickMarkType === 1) return date.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'short' });
+          if (tickMarkType === 2) return date.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', day: 'numeric' });
+          return date.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false, hour: '2-digit', minute: '2-digit' });
+        }
+      },
+      localization: {
+        locale: 'zh-TW',
+        timeFormatter: (time) => formatGMT8Full(time)
+      }
     });
 
     const candleSeries = chart.addCandlestickSeries({
@@ -449,7 +484,7 @@
       return rsiArr;
     }
 
-    // ========== 5. 原版「做多/做空」文字標記 ==========
+    // ========== 5. 訊號與原版標記 ==========
     let rawCandles = [];
     let lastAlertTimestamp = 0;
 
@@ -482,11 +517,9 @@
         const prevRsi = rsi[i - 1];
         const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
 
-        // 原版做多判斷：快線金叉慢線且站上慢線
         const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
         const canLong = (i - lastLongIdx >= cooldown);
 
-        // 原版做空判斷：死叉或超買回落
         const deathCross = prevFast >= prevSlow && curFast < curSlow;
         const wasOverbought = prevRsi >= 65;
         const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
@@ -504,7 +537,7 @@
 
           if (i === len - 1 && cur.time !== lastAlertTimestamp) {
             lastAlertTimestamp = cur.time;
-            triggerSignal("BUY", cur.close, cur.close - curAtr * 1.5);
+            triggerSignal("BUY", cur.close, cur.close - curAtr * 1.5, cur.time);
           }
         } else if (((wasOverbought && rsiCrossDown) || deathCross) && canShort) {
           lastShortIdx = i;
@@ -518,12 +551,11 @@
 
           if (i === len - 1 && cur.time !== lastAlertTimestamp) {
             lastAlertTimestamp = cur.time;
-            triggerSignal("SELL", cur.close, cur.close + curAtr * 1.5);
+            triggerSignal("SELL", cur.close, cur.close + curAtr * 1.5, cur.time);
           }
         }
       }
 
-      // 載入原生圖表標記（完全對齊第一張圖）
       candleSeries.setMarkers(markers);
 
       const last = rawCandles[len - 1];
@@ -550,7 +582,7 @@
       }
     }
 
-    function triggerSignal(type, price, sl) {
+    function triggerSignal(type, price, sl, timestampSec) {
       playAlertSound(type);
       sendDiscordNotification(type, price, sl, currentInterval);
 
@@ -560,7 +592,7 @@
       document.getElementById('last-sig-sl').innerText = sl.toFixed(2) + " USDT";
 
       const logList = document.getElementById('log-list');
-      const timeStr = new Date().toLocaleTimeString();
+      const timeStr = timestampSec ? formatGMT8Time(timestampSec) : formatGMT8Time(Math.floor(Date.now() / 1000));
       const div = document.createElement('div');
       div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
       div.innerHTML = `<strong>[${timeStr}] (${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
