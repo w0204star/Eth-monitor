@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ETH/USDT 專業監控中心</title>
+  <title>ETH/USDT 獨立監控中心</title>
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,6 +22,7 @@
       align-items: center;
       border-bottom: 1px solid #232733;
       height: 52px;
+      gap: 10px;
     }
     .header-left { display: flex; align-items: center; gap: 12px; }
     .header-title { font-weight: 700; font-size: 1.05rem; color: #f0b90b; white-space: nowrap; }
@@ -252,7 +253,7 @@
   </main>
 
   <script>
-    // ========== 1. Discord Webhook ==========
+    // ========== 1. Discord Webhook 模組 ==========
     let discordWebhookUrl = localStorage.getItem('eth_discord_webhook') || '';
     const dcInput = document.getElementById('dc-webhook-url');
     if (discordWebhookUrl) dcInput.value = discordWebhookUrl;
@@ -364,7 +365,7 @@
       }
     }
 
-    // ========== 3. 圖表引擎 ==========
+    // ========== 3. 圖表初始化 ==========
     const chartContainer = document.getElementById('chart-container');
     const chart = LightweightCharts.createChart(chartContainer, {
       layout: { background: { color: '#0f121a' }, textColor: '#8b949e' },
@@ -448,7 +449,7 @@
       return rsiArr;
     }
 
-    // ========== 5. 原生標記與多空訊號計算 ==========
+    // ========== 5. 原版「做多/做空」文字標記 ==========
     let rawCandles = [];
     let lastAlertTimestamp = 0;
 
@@ -481,11 +482,11 @@
         const prevRsi = rsi[i - 1];
         const curAtr = atr[i - (len - atr.length)] || (cur.close * 0.015);
 
-        // 做多：黃藍金叉突破
+        // 原版做多判斷：快線金叉慢線且站上慢線
         const goldCross = prevFast <= prevSlow && curFast > curSlow && cur.close > curSlow;
         const canLong = (i - lastLongIdx >= cooldown);
 
-        // 做空：死叉或超買回落
+        // 原版做空判斷：死叉或超買回落
         const deathCross = prevFast >= prevSlow && curFast < curSlow;
         const wasOverbought = prevRsi >= 65;
         const rsiCrossDown = prevRsi >= 60 && curRsi < 60;
@@ -522,10 +523,9 @@
         }
       }
 
-      // 將標記綁定進圖表
+      // 載入原生圖表標記（完全對齊第一張圖）
       candleSeries.setMarkers(markers);
 
-      // 更新儀表板
       const last = rawCandles[len - 1];
       const curFast = fastEma[len - 1].value;
       const curSlow = slowEma[len - 1].value;
