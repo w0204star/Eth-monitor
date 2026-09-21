@@ -266,7 +266,6 @@
         <button class="tf-btn" onclick="changeTimeframe('1h')">1h</button>
         <button class="tf-btn" onclick="changeTimeframe('4h')">4h</button>
         <button class="tf-btn" onclick="changeTimeframe('1d')">1d</button>
-        <!-- 自訂時間週期下拉選單 -->
         <select id="custom-tf-select" class="tf-select" onchange="changeTimeframe(this.value)">
           <option value="" disabled selected>自訂週期</option>
           <option value="1m">1m</option>
@@ -304,6 +303,10 @@
           <span id="cur-price" class="metric-val">--</span>
         </div>
         <div class="metric-row">
+          <span>當前成交量:</span>
+          <span id="cur-vol" class="metric-val">--</span>
+        </div>
+        <div class="metric-row">
           <span>EMA (9 / 21):</span>
           <span id="cur-ema" class="metric-val">-- / --</span>
         </div>
@@ -332,7 +335,6 @@
           <span id="audio-source-status" style="color: #2962ff; font-size: 0.72rem;">內建通知音</span>
         </div>
         
-        <!-- 音量調節 -->
         <div class="audio-config-row">
           <span>通知音量:</span>
           <div class="slider-container">
@@ -341,13 +343,11 @@
           </div>
         </div>
 
-        <!-- 試聽按鈕 -->
         <div class="audio-action-row">
           <button class="btn-audio-sub btn-test-bull" onclick="playAlertSound('BUY', true)">▶ 試聽多單聲</button>
           <button class="btn-audio-sub btn-test-bear" onclick="playAlertSound('SELL', true)">▶ 試聽空單聲</button>
         </div>
 
-        <!-- 自訂音檔導入 -->
         <div class="audio-action-row" style="margin-top: 8px;">
           <input type="file" id="buy-audio-input" class="file-input-hidden" accept="audio/*" onchange="loadCustomAudio(event, 'BUY')" />
           <input type="file" id="sell-audio-input" class="file-input-hidden" accept="audio/*" onchange="loadCustomAudio(event, 'SELL')" />
@@ -610,7 +610,7 @@
       }
     }
 
-    // ========== 3. 圖表初始化 (GMT+8) ==========
+    // ========== 3. 圖表初始化 (含主圖 + 底部成交量副圖) ==========
     const chartContainer = document.getElementById('chart-container');
     const chart = LightweightCharts.createChart(chartContainer, {
       layout: { background: { color: '#0f121a' }, textColor: '#8b949e' },
@@ -636,14 +636,31 @@
       }
     });
 
+    // 主圖 K 線系列
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#26a69a', downColor: '#ef5350',
       borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
     });
 
+    // 均線系列
     const fastEmaLine = chart.addLineSeries({ color: '#00e5ff', lineWidth: 2, title: 'EMA 9' });
     const slowEmaLine = chart.addLineSeries({ color: '#ff9100', lineWidth: 2, title: 'EMA 21' });
     const macroEmaLine = chart.addLineSeries({ color: '#787b86', lineWidth: 2, lineStyle: 2, title: 'EMA 200' });
+
+    // 底部成交量柱狀圖系列 (放置於主圖下方獨立 Scale)
+    const volumeSeries = chart.addHistogramSeries({
+      color: '#26a69a',
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', // 空字串表示疊加在主圖區域底端
+    });
+
+    // 配置成交量副圖高度比例 (佔下方 20% 高度)
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: {
+        top: 0.8,    // 上方 80% 留給 K 棒與均線
+        bottom: 0,   // 底端緊貼圖表邊緣
+      },
+    });
 
     window.addEventListener('resize', () => {
       chart.applyOptions({ width: chartContainer.clientWidth, height: chartContainer.clientHeight });
@@ -746,6 +763,14 @@
       slowEmaLine.setData(slowEma);
       macroEmaLine.setData(macroEma);
 
+      // 同步渲染成交量副圖資料
+      const volumeData = rawCandles.map(d => ({
+        time: d.time,
+        value: d.volume || 0,
+        color: d.close >= d.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
+      }));
+      volumeSeries.setData(volumeData);
+
       const markers = [];
       const detectedSignals = [];
       const len = rawCandles.length;
@@ -835,6 +860,7 @@
       const curAtrVal = atr[atr.length - 1];
 
       document.getElementById('cur-price').innerText = last.close.toFixed(2) + ' U';
+      document.getElementById('cur-vol').innerText = last.volume ? (last.volume >= 1000 ? (last.volume / 1000).toFixed(2) + 'k' : last.volume.toFixed(1)) : '--';
       document.getElementById('cur-ema').innerText = curFast.toFixed(1) + ' / ' + curSlow.toFixed(1);
       document.getElementById('cur-ema200').innerText = curMacro.toFixed(1) + (last.close > curMacro ? ' (看多)' : ' (看空)');
       document.getElementById('cur-ema200').className = 'metric-val ' + (last.close > curMacro ? 'val-bull' : 'val-bear');
@@ -853,7 +879,7 @@
       if (isInitialBoot) isInitialBoot = false;
     }
 
-    // ========== 6. 週期切換與行情載入 (含自訂週期支援) ==========
+    // ========== 6. 週期切換與行情載入 ==========
     let activeWs = null;
 
     function changeTimeframe(tf) {
@@ -861,7 +887,6 @@
       currentInterval = tf;
       isInitialBoot = true;
 
-      // 檢查是否為快捷按鈕之一
       let isShortcut = false;
       document.querySelectorAll('.tf-btn').forEach(btn => {
         const match = btn.innerText.toLowerCase() === tf.toLowerCase();
@@ -869,7 +894,6 @@
         if (match) isShortcut = true;
       });
 
-      // 同步自訂下拉選單狀態
       const selectEl = document.getElementById('custom-tf-select');
       if (selectEl) {
         selectEl.value = tf;
@@ -910,7 +934,8 @@
             open: parseFloat(d[1]),
             high: parseFloat(d[2]),
             low: parseFloat(d[3]),
-            close: parseFloat(d[4])
+            close: parseFloat(d[4]),
+            volume: parseFloat(d[5])
           }));
 
           candleSeries.setData(rawCandles);
@@ -951,7 +976,8 @@
           open: parseFloat(k.o),
           high: parseFloat(k.h),
           low: parseFloat(k.l),
-          close: parseFloat(k.c)
+          close: parseFloat(k.c),
+          volume: parseFloat(k.v)
         };
 
         const last = rawCandles[rawCandles.length - 1];
@@ -962,6 +988,11 @@
         }
 
         candleSeries.update(candle);
+        volumeSeries.update({
+          time: candle.time,
+          value: candle.volume,
+          color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
+        });
         runAnalysisAndRender();
       };
 
