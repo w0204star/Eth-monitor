@@ -428,13 +428,17 @@
       alert('已送出測試訊息（包含 @everyone），請至 Discord 頻道查看！');
     }
 
-    // ========== 2. 純音效通知系統 (無人聲播報) ==========
+    // ========== 2. 純音效通知系統 (排他性單一播放機制) ==========
     let audioCtx = null;
     let audioEnabled = true;
     let alertVolume = parseFloat(localStorage.getItem('eth_alert_volume') || '0.8');
     let customBuyAudioBase64 = localStorage.getItem('eth_custom_buy_audio') || null;
     let customSellAudioBase64 = localStorage.getItem('eth_custom_sell_audio') || null;
     let currentInterval = '15m';
+
+    // 排他性控制變數：確保同一時間只會有一個聲音
+    let currentPlayingAudio = null;
+    let currentOscillator = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       const slider = document.getElementById('volume-slider');
@@ -446,6 +450,25 @@
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function stopCurrentPlayingSound() {
+      // 1. 若有正在播放的自訂音訊，立即暫停並歸零
+      if (currentPlayingAudio) {
+        try {
+          currentPlayingAudio.pause();
+          currentPlayingAudio.currentTime = 0;
+        } catch (e) {}
+        currentPlayingAudio = null;
+      }
+      // 2. 若有正在發聲的 Web Audio 振盪器，立即中斷
+      if (currentOscillator) {
+        try {
+          currentOscillator.stop();
+          currentOscillator.disconnect();
+        } catch (e) {}
+        currentOscillator = null;
+      }
     }
 
     function updateVolume(val) {
@@ -492,6 +515,7 @@
     }
 
     function resetCustomAudios() {
+      stopCurrentPlayingSound();
       customBuyAudioBase64 = null;
       customSellAudioBase64 = null;
       localStorage.removeItem('eth_custom_buy_audio');
@@ -503,6 +527,7 @@
     function toggleAudio() {
       initAudio();
       audioEnabled = !audioEnabled;
+      if (!audioEnabled) stopCurrentPlayingSound();
       const btn = document.getElementById('btn-audio');
       btn.innerText = audioEnabled ? "🔊 聲音提醒" : "🔇 已靜音";
       btn.className = audioEnabled ? "btn-audio" : "btn-audio muted";
@@ -512,19 +537,27 @@
       if (!audioEnabled && !isTest) return;
       initAudio();
 
+      // ★ 核心優化：發聲前立即終止上一段聲音，保證排他性單一播放
+      stopCurrentPlayingSound();
+
       // 1. 若有自訂上傳音檔，播放自訂音訊
       const customAudioData = (type === "BUY") ? customBuyAudioBase64 : customSellAudioBase64;
       if (customAudioData) {
         const audio = new Audio(customAudioData);
         audio.volume = alertVolume;
+        currentPlayingAudio = audio;
+        audio.onended = () => {
+          if (currentPlayingAudio === audio) currentPlayingAudio = null;
+        };
         audio.play().catch(e => console.warn('自訂音訊播放受阻:', e));
       } else {
-        // 2. 播放清脆的電子通知音 (多單清脆上揚雙音 / 空單低音告警)
+        // 2. 播放清脆的電子通知音
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
         gain.connect(audioCtx.destination);
+        currentOscillator = osc;
 
         if (type === "BUY") {
           osc.type = "sine";
@@ -543,6 +576,10 @@
           osc.start(now);
           osc.stop(now + 0.4);
         }
+
+        osc.onended = () => {
+          if (currentOscillator === osc) currentOscillator = null;
+        };
       }
     }
 
