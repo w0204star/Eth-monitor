@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ETH/USDT 專業監控中心 (GMT+8)</title>
+  <title>Crypto 多幣種專業監控中心 (GMT+8)</title>
   
-  <!-- 瀏覽器分頁圖標 (Favicon: ETH 經典鑽石菱形圖標) -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23627EEA'/%3E%3Cg fill='%23FFF' fill-rule='nonzero'%3E%3Cpath fill-opacity='.6' d='M16.498 4v8.87l7.497 3.35z'/%3E%3Cpath d='M16.498 4L9 16.22l7.498-3.35z'/%3E%3Cpath fill-opacity='.6' d='M16.498 21.968v6.027L24 17.616z'/%3E%3Cpath d='M16.498 27.995v-6.028L9 17.616z'/%3E%3Cpath fill-opacity='.2' d='M16.498 20.573l7.497-4.353-7.497-3.348z'/%3E%3Cpath fill-opacity='.6' d='M9 16.22l7.498 4.353v-7.701z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E" />
+  <!-- 預設分頁圖標 (SVG 鑽石幾何) -->
+  <link id="dynamic-favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23627EEA'/%3E%3Cpath fill='%23FFF' d='M16.5 4v8.9l7.5 3.3zM16.5 4L9 16.2l7.5-3.3zM16.5 22v6L24 17.6zM16.5 28v-6L9 17.6z'/%3E%3C/svg%3E" />
 
   <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
   <style>
@@ -29,8 +29,32 @@
       gap: 10px;
     }
     .header-left { display: flex; align-items: center; gap: 10px; }
-    .header-logo { width: 24px; height: 24px; vertical-align: middle; }
-    .header-title { font-weight: 700; font-size: 1.05rem; color: #f0b90b; white-space: nowrap; }
+    
+    /* 幣種切換下拉選單樣式 */
+    .symbol-select-container {
+      display: flex;
+      align-items: center;
+      background: #0d1017;
+      border: 1px solid #282f42;
+      border-radius: 6px;
+      padding: 2px 6px;
+      gap: 6px;
+    }
+    .symbol-icon { width: 20px; height: 20px; vertical-align: middle; }
+    .symbol-select {
+      background: transparent;
+      border: none;
+      color: #f0b90b;
+      font-size: 0.95rem;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+    }
+    .symbol-select option {
+      background: #151924;
+      color: #fff;
+    }
+
     .status-badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; border: 1px solid #33394d; font-weight: 600; white-space: nowrap; }
     .status-connected { color: #00e676; background: rgba(0, 230, 118, 0.1); border-color: #00e676; }
     .status-connecting { color: #ffab00; background: rgba(255, 171, 0, 0.1); border-color: #ffab00; }
@@ -51,7 +75,7 @@
       border: none;
       color: #fff;
       font-size: 0.75rem;
-      width: 130px;
+      width: 120px;
       outline: none;
     }
     .btn-dc {
@@ -76,7 +100,6 @@
       font-weight: 600;
     }
 
-    /* 測量工具按鈕 */
     .btn-measure {
       background: #232733;
       border: 1px solid #3b4254;
@@ -97,7 +120,6 @@
       box-shadow: 0 0 8px rgba(41, 98, 255, 0.5);
     }
 
-    /* 多空開關按鈕群組 */
     .switch-group {
       display: flex;
       background: #0d1017;
@@ -184,7 +206,6 @@
       background: #0f121a;
     }
 
-    /* 測量層 Canvas 與 Tooltip 資訊方塊 */
     #measure-canvas {
       position: absolute;
       top: 0;
@@ -246,7 +267,6 @@
     .val-bull { color: #26a69a !important; }
     .val-bear { color: #ef5350 !important; }
 
-    /* 音效設定面板樣式 */
     .audio-config-row {
       display: flex;
       align-items: center;
@@ -311,20 +331,21 @@
 <body onclick="initAudio()">
   <header>
     <div class="header-left">
-      <svg class="header-logo" viewBox="0 0 32 32">
-        <g fill="none" fill-rule="evenodd">
+      <!-- 幣種快捷切換選單 -->
+      <div class="symbol-select-container">
+        <svg id="current-coin-icon" class="symbol-icon" viewBox="0 0 32 32">
+          <!-- 預設 ETH 圖標 -->
           <circle cx="16" cy="16" r="16" fill="#627EEA"/>
-          <g fill="#FFF" fill-rule="nonzero">
-            <path fill-opacity=".6" d="M16.498 4v8.87l7.497 3.35z"/>
-            <path d="M16.498 4L9 16.22l7.498-3.35z"/>
-            <path fill-opacity=".6" d="M16.498 21.968v6.027L24 17.616z"/>
-            <path d="M16.498 27.995v-6.028L9 17.616z"/>
-            <path fill-opacity=".2" d="M16.498 20.573l7.497-4.353-7.497-3.348z"/>
-            <path fill-opacity=".6" d="M9 16.22l7.498 4.353v-7.701z"/>
-          </g>
-        </g>
-      </svg>
-      <span class="header-title">ETH/USDT 專業監控中心 (GMT+8)</span>
+          <path fill="#FFF" fill-opacity=".6" d="M16.5 4v8.9l7.5 3.3zM16.5 22v6L24 17.6z"/>
+          <path fill="#FFF" d="M16.5 4L9 16.2l7.5-3.3zM16.5 28v-6L9 17.6z"/>
+        </svg>
+        <select id="symbol-selector" class="symbol-select" onchange="changeSymbol(this.value)">
+          <option value="ETHUSDT" selected>ETH/USDT</option>
+          <option value="BTCUSDT">BTC/USDT</option>
+          <option value="SOLUSDT">SOL/USDT</option>
+        </select>
+      </div>
+
       <span id="conn-status" class="status-badge status-connecting">連線中...</span>
     </div>
     
@@ -382,7 +403,7 @@
     <aside>
       <div class="card">
         <div class="card-title">
-          <span>戰情儀表板</span>
+          <span id="cur-panel-title">戰情儀表板 (ETH)</span>
           <span id="cur-tf-label" style="color:#00e676;">15M 週期</span>
         </div>
         <div class="metric-row">
@@ -474,6 +495,57 @@
   </main>
 
   <script>
+    // ========== 幣種管理設定 (ETH / BTC / SOL) ==========
+    let currentSymbol = localStorage.getItem('crypto_selected_symbol') || 'ETHUSDT';
+    let currentInterval = '15m';
+
+    const COIN_METAS = {
+      'ETHUSDT': {
+        name: 'ETH',
+        color: '#627EEA',
+        svg: `<circle cx="16" cy="16" r="16" fill="#627EEA"/><path fill="#FFF" fill-opacity=".6" d="M16.5 4v8.9l7.5 3.3zM16.5 22v6L24 17.6z"/><path fill="#FFF" d="M16.5 4L9 16.2l7.5-3.3zM16.5 28v-6L9 17.6z"/>`
+      },
+      'BTCUSDT': {
+        name: 'BTC',
+        color: '#F7931A',
+        svg: `<circle cx="16" cy="16" r="16" fill="#F7931A"/><path fill="#FFF" d="M22.8 13.7c.3-2.1-1.3-3.2-3.5-3.9l.7-2.9-1.8-.4-.7 2.8c-.5-.1-1-.2-1.5-.3l.7-2.9-1.8-.4-.7 2.9c-.4-.1-.8-.2-1.1-.3l-2.4-.6-.5 1.9s1.3.3 1.3.3c.7.2.8.7.8 1.1l-.8 3.3c.1 0 .1 0 .2.1l-.2-.1-1.1 4.6c-.1.2-.3.6-.8.4 0 0-1.3-.3-1.3-.3l-.9 2.1 2.3.6c.4.1.9.2 1.3.3l-.7 3 1.8.4.7-2.9c.5.1 1 .2 1.5.3l-.7 2.9 1.8.4.7-2.9c3.1.6 5.4.3 6.4-2.4.8-2.2 0-3.5-1.6-4.3 1.1-.3 2-1 2.2-2.5zm-3.9 5.4c-.6 2.3-4.5 1-5.7.8l1-4.1c1.3.3 5.3 1 4.7 3.3zm.6-5.5c-.5 2.1-3.7 1-4.7.8l.9-3.7c1 .3 4.3.8 3.8 2.9z"/>`
+      },
+      'SOLUSDT': {
+        name: 'SOL',
+        color: '#9945FF',
+        svg: `<circle cx="16" cy="16" r="16" fill="#000"/><path fill="url(#sol-grad)" d="M8 21.5h13.5l2.5-3H10.5zM10.5 13.5H24l-2.5-3H8zM8 7.5h13.5l2.5-3H10.5z"/><defs><linearGradient id="sol-grad" x1="8" y1="4.5" x2="24" y2="21.5" gradientUnits="userSpaceOnUse"><stop stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/></linearGradient></defs>`
+      }
+    };
+
+    function updateCoinHeaderUI() {
+      const meta = COIN_METAS[currentSymbol] || COIN_METAS['ETHUSDT'];
+      const iconEl = document.getElementById('current-coin-icon');
+      if (iconEl) iconEl.innerHTML = meta.svg;
+
+      const titleEl = document.getElementById('cur-panel-title');
+      if (titleEl) titleEl.innerText = `戰情儀表板 (${meta.name})`;
+
+      document.title = `${meta.name}/USDT 專業監控中心 (GMT+8)`;
+    }
+
+    function changeSymbol(newSymbol) {
+      if (!newSymbol || currentSymbol === newSymbol) return;
+      currentSymbol = newSymbol;
+      localStorage.setItem('crypto_selected_symbol', currentSymbol);
+
+      updateCoinHeaderUI();
+      isInitialBoot = true;
+      clearMeasurement();
+
+      if (activeWs) {
+        activeWs.onclose = null;
+        activeWs.close();
+        activeWs = null;
+      }
+
+      fetchHistoricalData();
+    }
+
     // ========== 0. 多空訊號開關控制 ==========
     let enableLongSignal = localStorage.getItem('eth_enable_long') !== 'false';
     let enableShortSignal = localStorage.getItem('eth_enable_short') !== 'false';
@@ -548,20 +620,22 @@
       if (!discordWebhookUrl) return;
       const isBuy = type === "BUY";
       const gmt8Time = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+      const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
       const payload = {
-        username: "ETH 策略哨兵 (GMT+8)",
+        username: `${coinName} 策略哨兵 (GMT+8)`,
         content: "@everyone",
         embeds: [{
-          title: isBuy ? "🚀 【做多信號觸發】ETHUSDT" : "🩸 【做空信號觸發】ETHUSDT",
+          title: isBuy ? `🚀 【做多信號觸發】${currentSymbol}` : `🩸 【做空信號觸發】${currentSymbol}`,
           color: isBuy ? 0x26a69a : 0xef5350,
           fields: [
+            { name: "監控標的", value: currentSymbol, inline: true },
             { name: "監控週期", value: tf, inline: true },
             { name: "觸發現價", value: `$${price.toFixed(2)}`, inline: true },
             { name: "建議防守止損", value: `$${sl.toFixed(2)}`, inline: true },
             { name: "觸發時間 (GMT+8)", value: gmt8Time, inline: false }
           ],
           timestamp: new Date().toISOString(),
-          footer: { text: "ETH 獨立戰情中心推播" }
+          footer: { text: "Crypto 獨立戰情中心推播" }
         }]
       };
       try {
@@ -580,7 +654,8 @@
         alert('請先在輸入框貼上 Webhook 網址並點擊儲存！');
         return;
       }
-      sendDiscordNotification("BUY", 2750.0, 2730.0, `${currentInterval} (測試)`);
+      const demoPrice = currentSymbol.startsWith('BTC') ? 95000.0 : currentSymbol.startsWith('SOL') ? 180.0 : 2750.0;
+      sendDiscordNotification("BUY", demoPrice, demoPrice * 0.985, `${currentInterval} (測試)`);
       alert('已送出測試訊息（包含 @everyone），請至 Discord 頻道查看！');
     }
 
@@ -590,12 +665,15 @@
     let alertVolume = parseFloat(localStorage.getItem('eth_alert_volume') || '0.8');
     let customBuyAudioBase64 = localStorage.getItem('eth_custom_buy_audio') || null;
     let customSellAudioBase64 = localStorage.getItem('eth_custom_sell_audio') || null;
-    let currentInterval = '15m';
 
     let currentPlayingAudio = null;
     let currentOscillator = null;
 
     document.addEventListener('DOMContentLoaded', () => {
+      const symbolSelect = document.getElementById('symbol-selector');
+      if (symbolSelect) symbolSelect.value = currentSymbol;
+      updateCoinHeaderUI();
+
       const slider = document.getElementById('volume-slider');
       slider.value = Math.round(alertVolume * 100);
       document.getElementById('volume-val').innerText = slider.value + '%';
@@ -1019,9 +1097,10 @@
 
       const logList = document.getElementById('log-list');
       const timeStr = timestampSec ? formatGMT8Full(timestampSec) : formatGMT8Full(Math.floor(Date.now() / 1000));
+      const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
       const div = document.createElement('div');
       div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
-      div.innerHTML = `<strong>[${timeStr}] (${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
+      div.innerHTML = `<strong>[${timeStr}] (${coinName} ${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
       
       if (logList.children[0] && (logList.children[0].innerText.includes('中...') || logList.children[0].innerText.includes('尚未'))) {
         logList.innerHTML = '';
@@ -1029,7 +1108,6 @@
       logList.insertBefore(div, logList.firstChild);
     }
 
-    // 節流分析排程：避免在每秒數十次 Tick 時阻塞渲染
     function scheduleAnalysis() {
       if (analysisTimer) return;
       analysisTimer = setTimeout(() => {
@@ -1114,14 +1192,14 @@
         logList.innerHTML = '';
         for (let sig of recentSubset) {
           renderSignalToLog(sig.type, sig.price, sig.sl, sig.time);
-          notifiedSignals.add(`${sig.time}_${sig.type}`);
+          notifiedSignals.add(`${currentSymbol}_${sig.time}_${sig.type}`);
         }
       }
 
       if (!isInitialBoot) {
         for (let sig of detectedSignals) {
           if (sig.idx >= len - 2) {
-            const sigKey = `${sig.time}_${sig.type}`;
+            const sigKey = `${currentSymbol}_${sig.time}_${sig.type}`;
             if (!notifiedSignals.has(sigKey)) {
               notifiedSignals.add(sigKey);
               playAlertSound(sig.type);
@@ -1192,12 +1270,13 @@
 
     async function fetchHistoricalData() {
       const statusEl = document.getElementById('conn-status');
-      statusEl.innerText = `讀取 ${currentInterval} 中...`;
+      const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
+      statusEl.innerText = `讀取 ${coinName} ${currentInterval}...`;
       statusEl.className = 'status-badge status-connecting';
 
       const endpoints = [
-        `https://fapi.binance.com/fapi/v1/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1000`,
-        `https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=${currentInterval}&limit=1000`
+        `https://fapi.binance.com/fapi/v1/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=1000`,
+        `https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=1000`
       ];
 
       let success = false;
@@ -1237,7 +1316,7 @@
       }
 
       if (success) {
-        statusEl.innerText = `即時連線 (${currentInterval})`;
+        statusEl.innerText = `即時連線 (${coinName} ${currentInterval})`;
         statusEl.className = 'status-badge status-connected';
         initWebSocket();
       } else {
@@ -1248,19 +1327,20 @@
 
     // ========== 8. 零延遲 WebSocket 即時跳動監聽 ==========
     function initWebSocket() {
-      // 優先使用合約即時頻道，若斷線自動切換
+      const lowerSymbol = currentSymbol.toLowerCase();
       const wsUrls = [
-        `wss://fstream.binance.com/ws/ethusdt@kline_${currentInterval}`,
-        `wss://stream.binance.com:9443/ws/ethusdt@kline_${currentInterval}`
+        `wss://fstream.binance.com/ws/${lowerSymbol}@kline_${currentInterval}`,
+        `wss://stream.binance.com:9443/ws/${lowerSymbol}@kline_${currentInterval}`
       ];
       
       let urlIdx = 0;
       function connect() {
         activeWs = new WebSocket(wsUrls[urlIdx]);
         const statusEl = document.getElementById('conn-status');
+        const coinName = COIN_METAS[currentSymbol]?.name || currentSymbol;
 
         activeWs.onopen = () => {
-          statusEl.innerText = `即時連線 (${currentInterval})`;
+          statusEl.innerText = `即時連線 (${coinName} ${currentInterval})`;
           statusEl.className = 'status-badge status-connected';
         };
 
@@ -1278,7 +1358,6 @@
             volume: parseFloat(k.v)
           };
 
-          // 1. 第一毫秒直接繪製最新價與成交量，保證平滑跳動
           candleSeries.update(candle);
           volumeSeries.update({
             time: candle.time,
@@ -1286,11 +1365,11 @@
             color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
           });
 
-          // 2. 即時更新右側即時現價與量能面板
-          document.getElementById('cur-price').innerText = candle.close.toFixed(2) + ' U';
+          // 自動調整價格小數位數顯示 (BTC/ETH 2位，SOL 2位)
+          const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
+          document.getElementById('cur-price').innerText = candle.close.toFixed(decimals) + ' U';
           document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
 
-          // 3. 維護記憶體數據隊列
           const last = rawCandles[rawCandles.length - 1];
           if (last && last.time === candle.time) {
             rawCandles[rawCandles.length - 1] = candle;
@@ -1298,7 +1377,6 @@
             rawCandles.push(candle);
           }
 
-          // 4. 節流調度後續指標運算
           scheduleAnalysis();
         };
 
