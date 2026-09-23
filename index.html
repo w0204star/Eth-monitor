@@ -332,7 +332,6 @@
 <body onclick="initAudio()">
   <header>
     <div class="header-left">
-      <!-- 5大幣種切換列 -->
       <div class="coin-switcher">
         <button class="coin-btn active" data-coin="ETHUSDT" onclick="changeSymbol('ETHUSDT')">ETH</button>
         <button class="coin-btn" data-coin="BTCUSDT" onclick="changeSymbol('BTCUSDT')">BTC</button>
@@ -411,7 +410,7 @@
         </div>
         <div class="metric-row">
           <span>更新模式:</span>
-          <span class="metric-val" style="color:#38bdf8;">固定每 1 分鐘更新</span>
+          <span class="metric-val" style="color:#00e676;">每秒即時更新 (1s)</span>
         </div>
         <div class="metric-row">
           <span>訊號開關狀態:</span>
@@ -505,10 +504,14 @@
       'XRPUSDT': 'XRP'
     };
 
-    function getPriceDecimals(symbol) {
-      if (symbol.startsWith('DOGE') || symbol.startsWith('XRP')) return 4;
-      if (symbol.startsWith('BTC')) return 1;
-      return 2;
+    function getPriceConfig(symbol) {
+      if (symbol.startsWith('DOGE') || symbol.startsWith('XRP')) {
+        return { precision: 5, minMove: 0.00001 };
+      }
+      if (symbol.startsWith('BTC')) {
+        return { precision: 1, minMove: 0.1 };
+      }
+      return { precision: 2, minMove: 0.01 };
     }
 
     function updateCoinUI() {
@@ -521,11 +524,26 @@
       document.title = `${name}/USDT 專業監控中心 (GMT+8)`;
     }
 
+    function applyDynamicPrecision(symbol) {
+      const cfg = getPriceConfig(symbol);
+      const priceFormat = {
+        type: 'price',
+        precision: cfg.precision,
+        minMove: cfg.minMove
+      };
+
+      candleSeries.applyOptions({ priceFormat });
+      fastEmaLine.applyOptions({ priceFormat });
+      slowEmaLine.applyOptions({ priceFormat });
+      macroEmaLine.applyOptions({ priceFormat });
+    }
+
     function changeSymbol(newSymbol) {
       if (!newSymbol || currentSymbol === newSymbol) return;
       currentSymbol = newSymbol;
       localStorage.setItem('crypto_selected_symbol', currentSymbol);
 
+      applyDynamicPrecision(currentSymbol);
       updateCoinUI();
       isInitialBoot = true;
       clearMeasurement();
@@ -600,7 +618,7 @@
       const isBuy = type === "BUY";
       const gmt8Time = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
-      const dec = getPriceDecimals(currentSymbol);
+      const dec = getPriceConfig(currentSymbol).precision;
       const payload = {
         username: `${coinName} 策略哨兵 (GMT+8)`,
         content: "@everyone",
@@ -637,8 +655,8 @@
       let demoPrice = 2750.0;
       if (currentSymbol.startsWith('BTC')) demoPrice = 95000.0;
       else if (currentSymbol.startsWith('SOL')) demoPrice = 180.0;
-      else if (currentSymbol.startsWith('DOGE')) demoPrice = 0.1525;
-      else if (currentSymbol.startsWith('XRP')) demoPrice = 0.5842;
+      else if (currentSymbol.startsWith('DOGE')) demoPrice = 0.15255;
+      else if (currentSymbol.startsWith('XRP')) demoPrice = 0.58421;
 
       sendDiscordNotification("BUY", demoPrice, demoPrice * 0.985, `${currentInterval} (測試)`);
       alert('已送出測試訊息（包含 @everyone），請至 Discord 頻道查看！');
@@ -654,6 +672,7 @@
     let currentOscillator = null;
 
     document.addEventListener('DOMContentLoaded', () => {
+      applyDynamicPrecision(currentSymbol);
       updateCoinUI();
       const slider = document.getElementById('volume-slider');
       slider.value = Math.round(alertVolume * 100);
@@ -817,14 +836,16 @@
       }
     });
 
+    const initCfg = getPriceConfig(currentSymbol);
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#26a69a', downColor: '#ef5350',
-      borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+      borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+      priceFormat: { type: 'price', precision: initCfg.precision, minMove: initCfg.minMove }
     });
 
-    const fastEmaLine = chart.addLineSeries({ color: '#00e5ff', lineWidth: 2, title: 'EMA 9' });
-    const slowEmaLine = chart.addLineSeries({ color: '#ff9100', lineWidth: 2, title: 'EMA 21' });
-    const macroEmaLine = chart.addLineSeries({ color: '#787b86', lineWidth: 2, lineStyle: 2, title: 'EMA 200' });
+    const fastEmaLine = chart.addLineSeries({ color: '#00e5ff', lineWidth: 2, title: 'EMA 9', priceFormat: { type: 'price', precision: initCfg.precision, minMove: initCfg.minMove } });
+    const slowEmaLine = chart.addLineSeries({ color: '#ff9100', lineWidth: 2, title: 'EMA 21', priceFormat: { type: 'price', precision: initCfg.precision, minMove: initCfg.minMove } });
+    const macroEmaLine = chart.addLineSeries({ color: '#787b86', lineWidth: 2, lineStyle: 2, title: 'EMA 200', priceFormat: { type: 'price', precision: initCfg.precision, minMove: initCfg.minMove } });
 
     const volumeSeries = chart.addHistogramSeries({
       color: '#26a69a',
@@ -970,7 +991,7 @@
         timeDiffStr = days > 0 ? `${days}天 ${hours}小時` : hours > 0 ? `${hours}小時 ${mins}分` : `${mins}分鐘`;
       }
 
-      const dec = getPriceDecimals(currentSymbol);
+      const dec = getPriceConfig(currentSymbol).precision;
       const sign = isPositive ? '+' : '';
       measureTooltip.innerHTML = `
         <div style="font-size: 0.92rem; font-weight: 700; color: ${strokeColor}; margin-bottom: 2px;">
@@ -1062,7 +1083,7 @@
     let isInitialBoot = true;
 
     function renderSignalToLog(type, price, sl, timestampSec) {
-      const dec = getPriceDecimals(currentSymbol);
+      const dec = getPriceConfig(currentSymbol).precision;
       document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
       document.getElementById('last-sig-type').className = "metric-val " + (type === "BUY" ? "val-bull" : "val-bear");
       document.getElementById('last-sig-price').innerText = price.toFixed(dec) + " USDT";
@@ -1177,7 +1198,7 @@
         }
 
         const last = rawCandles[len - 1];
-        const dec = getPriceDecimals(currentSymbol);
+        const dec = getPriceConfig(currentSymbol).precision;
         const curFast = fastEma[len - 1].value;
         const curSlow = slowEma[len - 1].value;
         const curMacro = macroEma[len - 1].value;
@@ -1230,38 +1251,28 @@
       fetchHistoricalData();
     }
 
+    // ========== 每秒定時更新模組 ==========
     let updateTimer = null;
-    let countdownTimer = null;
-    let countdownSeconds = 60;
 
     function stopTimer() {
       if (updateTimer) {
         clearInterval(updateTimer);
         updateTimer = null;
       }
-      if (countdownTimer) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-      }
     }
 
-    function startOneMinuteSchedule() {
+    function startSecondSchedule() {
       stopTimer();
-      countdownSeconds = 60;
+      const statusEl = document.getElementById('conn-status');
+      if (statusEl) {
+        statusEl.innerText = `每秒即時 (1s)`;
+        statusEl.className = 'status-badge status-connected';
+      }
 
-      countdownTimer = setInterval(() => {
-        countdownSeconds--;
-        if (countdownSeconds <= 0) countdownSeconds = 60;
-        const statusEl = document.getElementById('conn-status');
-        if (statusEl) {
-          statusEl.innerText = `定時更新 (下次: ${countdownSeconds}s)`;
-          statusEl.className = 'status-badge status-connected';
-        }
-      }, 1000);
-
+      // 每 1000 毫秒（1秒）觸發一次更新
       updateTimer = setInterval(() => {
         fetchLatestCandle();
-      }, 60000);
+      }, 1000);
     }
 
     async function fetchHistoricalData() {
@@ -1302,7 +1313,7 @@
           volumeSeries.setData(volumeData);
 
           const last = rawCandles[rawCandles.length - 1];
-          const dec = getPriceDecimals(currentSymbol);
+          const dec = getPriceConfig(currentSymbol).precision;
           document.getElementById('cur-price').innerText = last.close.toFixed(dec) + ' U';
           document.getElementById('cur-vol').innerText = last.volume >= 1000 ? (last.volume / 1000).toFixed(2) + 'k' : last.volume.toFixed(1);
 
@@ -1317,13 +1328,14 @@
       }
 
       if (success) {
-        startOneMinuteSchedule();
+        startSecondSchedule();
       } else {
         statusEl.innerText = '連線失敗';
         statusEl.className = 'status-badge status-error';
       }
     }
 
+    // 每秒定時獲取最新一筆 K 線並更新
     async function fetchLatestCandle() {
       try {
         const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=2`);
@@ -1350,7 +1362,7 @@
             color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
           });
 
-          const dec = getPriceDecimals(currentSymbol);
+          const dec = getPriceConfig(currentSymbol).precision;
           document.getElementById('cur-price').innerText = candle.close.toFixed(dec) + ' U';
           document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
 
@@ -1363,7 +1375,7 @@
           runAnalysisAndRender();
         }
       } catch (err) {
-        console.warn("1分鐘定時更新失敗:", err);
+        console.warn("每秒定時更新失敗:", err);
       }
     }
 
