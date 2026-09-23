@@ -27,7 +27,7 @@
       height: 54px;
       gap: 8px;
     }
-    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left { display: flex; align-items: center; gap: 8px; }
     
     .coin-switcher {
       display: flex;
@@ -42,8 +42,8 @@
       background: transparent;
       border: none;
       color: #94a3b8;
-      padding: 6px 12px;
-      font-size: 0.85rem;
+      padding: 5px 10px;
+      font-size: 0.82rem;
       font-weight: 700;
       cursor: pointer;
       border-radius: 4px;
@@ -53,6 +53,8 @@
     .coin-btn.active[data-coin="ETHUSDT"] { background: #627EEA; color: #fff; box-shadow: 0 0 8px rgba(98, 126, 234, 0.4); }
     .coin-btn.active[data-coin="BTCUSDT"] { background: #F7931A; color: #fff; box-shadow: 0 0 8px rgba(247, 147, 26, 0.4); }
     .coin-btn.active[data-coin="SOLUSDT"] { background: #9945FF; color: #fff; box-shadow: 0 0 8px rgba(153, 69, 255, 0.4); }
+    .coin-btn.active[data-coin="DOGEUSDT"] { background: #C2A633; color: #fff; box-shadow: 0 0 8px rgba(194, 166, 51, 0.4); }
+    .coin-btn.active[data-coin="XRPUSDT"] { background: #23292F; color: #00e5ff; border: 1px solid #00e5ff; box-shadow: 0 0 8px rgba(0, 229, 255, 0.3); }
 
     .status-badge { font-size: 0.72rem; padding: 3px 7px; border-radius: 8px; border: 1px solid #33394d; font-weight: 600; white-space: nowrap; }
     .status-connected { color: #00e676; background: rgba(0, 230, 118, 0.1); border-color: #00e676; }
@@ -74,7 +76,7 @@
       border: none;
       color: #fff;
       font-size: 0.75rem;
-      width: 110px;
+      width: 100px;
       outline: none;
     }
     .btn-dc {
@@ -330,10 +332,13 @@
 <body onclick="initAudio()">
   <header>
     <div class="header-left">
+      <!-- 5大幣種切換列 -->
       <div class="coin-switcher">
         <button class="coin-btn active" data-coin="ETHUSDT" onclick="changeSymbol('ETHUSDT')">ETH</button>
         <button class="coin-btn" data-coin="BTCUSDT" onclick="changeSymbol('BTCUSDT')">BTC</button>
         <button class="coin-btn" data-coin="SOLUSDT" onclick="changeSymbol('SOLUSDT')">SOL</button>
+        <button class="coin-btn" data-coin="DOGEUSDT" onclick="changeSymbol('DOGEUSDT')">DOGE</button>
+        <button class="coin-btn" data-coin="XRPUSDT" onclick="changeSymbol('XRPUSDT')">XRP</button>
       </div>
 
       <span id="conn-status" class="status-badge status-connecting">連線中...</span>
@@ -495,8 +500,16 @@
     const COIN_NAMES = {
       'ETHUSDT': 'ETH',
       'BTCUSDT': 'BTC',
-      'SOLUSDT': 'SOL'
+      'SOLUSDT': 'SOL',
+      'DOGEUSDT': 'DOGE',
+      'XRPUSDT': 'XRP'
     };
+
+    function getPriceDecimals(symbol) {
+      if (symbol.startsWith('DOGE') || symbol.startsWith('XRP')) return 4;
+      if (symbol.startsWith('BTC')) return 1;
+      return 2;
+    }
 
     function updateCoinUI() {
       document.querySelectorAll('.coin-btn').forEach(btn => {
@@ -587,6 +600,7 @@
       const isBuy = type === "BUY";
       const gmt8Time = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
       const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
+      const dec = getPriceDecimals(currentSymbol);
       const payload = {
         username: `${coinName} 策略哨兵 (GMT+8)`,
         content: "@everyone",
@@ -596,8 +610,8 @@
           fields: [
             { name: "監控標的", value: currentSymbol, inline: true },
             { name: "監控週期", value: tf, inline: true },
-            { name: "觸發現價", value: `$${price.toFixed(2)}`, inline: true },
-            { name: "建議防守止損", value: `$${sl.toFixed(2)}`, inline: true },
+            { name: "觸發現價", value: `$${price.toFixed(dec)}`, inline: true },
+            { name: "建議防守止損", value: `$${sl.toFixed(dec)}`, inline: true },
             { name: "觸發時間 (GMT+8)", value: gmt8Time, inline: false }
           ],
           timestamp: new Date().toISOString(),
@@ -620,7 +634,12 @@
         alert('請先在輸入框貼上 Webhook 網址並點擊儲存！');
         return;
       }
-      const demoPrice = currentSymbol.startsWith('BTC') ? 95000.0 : currentSymbol.startsWith('SOL') ? 180.0 : 2750.0;
+      let demoPrice = 2750.0;
+      if (currentSymbol.startsWith('BTC')) demoPrice = 95000.0;
+      else if (currentSymbol.startsWith('SOL')) demoPrice = 180.0;
+      else if (currentSymbol.startsWith('DOGE')) demoPrice = 0.1525;
+      else if (currentSymbol.startsWith('XRP')) demoPrice = 0.5842;
+
       sendDiscordNotification("BUY", demoPrice, demoPrice * 0.985, `${currentInterval} (測試)`);
       alert('已送出測試訊息（包含 @everyone），請至 Discord 頻道查看！');
     }
@@ -951,10 +970,11 @@
         timeDiffStr = days > 0 ? `${days}天 ${hours}小時` : hours > 0 ? `${hours}小時 ${mins}分` : `${mins}分鐘`;
       }
 
+      const dec = getPriceDecimals(currentSymbol);
       const sign = isPositive ? '+' : '';
       measureTooltip.innerHTML = `
         <div style="font-size: 0.92rem; font-weight: 700; color: ${strokeColor}; margin-bottom: 2px;">
-          ${sign}${pctChange.toFixed(2)}% (${sign}${priceDiff.toFixed(2)} U)
+          ${sign}${pctChange.toFixed(2)}% (${sign}${priceDiff.toFixed(dec)} U)
         </div>
         <div style="color: #94a3b8; font-size: 0.76rem;">
           範圍: ${barCount} 根 K 線 | 歷時: ${timeDiffStr}
@@ -1042,17 +1062,18 @@
     let isInitialBoot = true;
 
     function renderSignalToLog(type, price, sl, timestampSec) {
+      const dec = getPriceDecimals(currentSymbol);
       document.getElementById('last-sig-type').innerText = type === "BUY" ? "▲ 做多進場" : "▼ 做空進場";
       document.getElementById('last-sig-type').className = "metric-val " + (type === "BUY" ? "val-bull" : "val-bear");
-      document.getElementById('last-sig-price').innerText = price.toFixed(2) + " USDT";
-      document.getElementById('last-sig-sl').innerText = sl.toFixed(2) + " USDT";
+      document.getElementById('last-sig-price').innerText = price.toFixed(dec) + " USDT";
+      document.getElementById('last-sig-sl').innerText = sl.toFixed(dec) + " USDT";
 
       const logList = document.getElementById('log-list');
       const timeStr = timestampSec ? formatGMT8Full(timestampSec) : formatGMT8Full(Math.floor(Date.now() / 1000));
       const coinName = COIN_NAMES[currentSymbol] || currentSymbol;
       const div = document.createElement('div');
       div.className = "log-item " + (type === "BUY" ? "log-long" : "log-short");
-      div.innerHTML = `<strong>[${timeStr}] (${coinName} ${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(2)} | 止損: ${sl.toFixed(2)}`;
+      div.innerHTML = `<strong>[${timeStr}] (${coinName} ${currentInterval}) ${type === "BUY" ? '🚀 做多' : '🩸 做空'}</strong><br/>進場: ${price.toFixed(dec)} | 止損: ${sl.toFixed(dec)}`;
       
       if (logList.children[0] && (logList.children[0].innerText.includes('中...') || logList.children[0].innerText.includes('尚未'))) {
         logList.innerHTML = '';
@@ -1156,17 +1177,18 @@
         }
 
         const last = rawCandles[len - 1];
+        const dec = getPriceDecimals(currentSymbol);
         const curFast = fastEma[len - 1].value;
         const curSlow = slowEma[len - 1].value;
         const curMacro = macroEma[len - 1].value;
         const curRsiVal = rsi[len - 1];
         const curAtrVal = atr[atr.length - 1];
 
-        document.getElementById('cur-ema').innerText = curFast.toFixed(1) + ' / ' + curSlow.toFixed(1);
-        document.getElementById('cur-ema200').innerText = curMacro.toFixed(1) + (last.close > curMacro ? ' (看多)' : ' (看空)');
+        document.getElementById('cur-ema').innerText = curFast.toFixed(dec) + ' / ' + curSlow.toFixed(dec);
+        document.getElementById('cur-ema200').innerText = curMacro.toFixed(dec) + (last.close > curMacro ? ' (看多)' : ' (看空)');
         document.getElementById('cur-ema200').className = 'metric-val ' + (last.close > curMacro ? 'val-bull' : 'val-bear');
         document.getElementById('cur-rsi').innerText = curRsiVal.toFixed(1);
-        document.getElementById('cur-atr').innerText = curAtrVal.toFixed(2);
+        document.getElementById('cur-atr').innerText = curAtrVal.toFixed(dec);
         
         const trendEl = document.getElementById('cur-trend');
         if (curFast > curSlow) {
@@ -1208,7 +1230,6 @@
       fetchHistoricalData();
     }
 
-    // ========== 固定 1 分鐘定時更新模組 ==========
     let updateTimer = null;
     let countdownTimer = null;
     let countdownSeconds = 60;
@@ -1238,7 +1259,6 @@
         }
       }, 1000);
 
-      // 每 60,000 毫秒（1分鐘）觸發一次更新
       updateTimer = setInterval(() => {
         fetchLatestCandle();
       }, 60000);
@@ -1282,8 +1302,8 @@
           volumeSeries.setData(volumeData);
 
           const last = rawCandles[rawCandles.length - 1];
-          const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
-          document.getElementById('cur-price').innerText = last.close.toFixed(decimals) + ' U';
+          const dec = getPriceDecimals(currentSymbol);
+          document.getElementById('cur-price').innerText = last.close.toFixed(dec) + ' U';
           document.getElementById('cur-vol').innerText = last.volume >= 1000 ? (last.volume / 1000).toFixed(2) + 'k' : last.volume.toFixed(1);
 
           chart.timeScale().fitContent();
@@ -1304,7 +1324,6 @@
       }
     }
 
-    // 1分鐘定時獲取最新一筆 K 線並更新
     async function fetchLatestCandle() {
       try {
         const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${currentSymbol}&interval=${currentInterval}&limit=2`);
@@ -1331,8 +1350,8 @@
             color: candle.close >= candle.open ? 'rgba(38, 166, 154, 0.45)' : 'rgba(239, 83, 80, 0.45)'
           });
 
-          const decimals = currentSymbol.startsWith('SOL') ? 2 : currentSymbol.startsWith('BTC') ? 1 : 2;
-          document.getElementById('cur-price').innerText = candle.close.toFixed(decimals) + ' U';
+          const dec = getPriceDecimals(currentSymbol);
+          document.getElementById('cur-price').innerText = candle.close.toFixed(dec) + ' U';
           document.getElementById('cur-vol').innerText = candle.volume >= 1000 ? (candle.volume / 1000).toFixed(2) + 'k' : candle.volume.toFixed(1);
 
           if (last.time === candle.time) {
